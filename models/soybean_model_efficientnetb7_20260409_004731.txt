@@ -1,0 +1,50 @@
+RELATORIO DE TREINAMENTO
+========================================================================
+Gerado em: 2026-04-09T05:50:23
+Modelo: EfficientNetB7
+Dataset: C:\Users\eduar\Desktop\Soybe-main\data\sem_fundo
+Arquivo de pesos: C:\Users\eduar\Desktop\Soybe-main\models\soybean_model_efficientnetb7_20260409_004731.pth
+
+CONFIGURACAO
+------------------------------------------------------------------------
+batch_size: 1
+num_epochs: 16
+learning_rate: 8e-05
+patience: 4
+train_split: 0.8
+val_split: 0.1
+
+RESULTADO FINAL
+------------------------------------------------------------------------
+accuracy: 31.00%
+best_val_loss: 3.330424
+total_time: 18171.6s
+num_classes: 6
+class_names: RGB_JPG_CHOCHOS_SF, RGB_JPG_ESVERDEADO_SF, RGB_JPG_INSETOS_SF, RGB_JPG_Normais_SF, RGB_JPG_PURPURAS_SF, RGB_JPG_QUEBRADOS_SF
+
+METRICAS POR CLASSE
+------------------------------------------------------------------------
+RGB_JPG_CHOCHOS_SF: precision=55.39% | recall=44.31% | f1=49.23% | support=580
+RGB_JPG_ESVERDEADO_SF: precision=5.70% | recall=49.29% | f1=10.21% | support=140
+RGB_JPG_INSETOS_SF: precision=0.00% | recall=0.00% | f1=0.00% | support=17
+RGB_JPG_Normais_SF: precision=91.81% | recall=23.35% | f1=37.23% | support=2017
+RGB_JPG_PURPURAS_SF: precision=18.60% | recall=72.73% | f1=29.63% | support=33
+RGB_JPG_QUEBRADOS_SF: precision=21.60% | recall=37.96% | f1=27.53% | support=619
+
+MATRIZ DE CONFUSAO
+------------------------------------------------------------------------
+257 263 0 11 14 35
+41 69 1 12 1 16
+1 8 0 3 0 5
+124 602 0 471 25 795
+4 3 0 0 24 2
+37 266 0 16 65 235
+
+ROC AUC POR CLASSE
+------------------------------------------------------------------------
+RGB_JPG_CHOCHOS_SF: auc=0.8380
+RGB_JPG_ESVERDEADO_SF: auc=0.6298
+RGB_JPG_INSETOS_SF: auc=0.4743
+RGB_JPG_Normais_SF: auc=0.6383
+RGB_JPG_PURPURAS_SF: auc=0.9062
+RGB_JPG_QUEBRADOS_SF: auc=0.4998

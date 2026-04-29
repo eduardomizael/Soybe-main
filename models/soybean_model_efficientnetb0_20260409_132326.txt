@@ -1,0 +1,94 @@
+RELATORIO DE TREINAMENTO
+========================================================================
+Gerado em: 2026-04-09T14:27:38
+Modelo: EfficientNetB0
+Dataset: C:\Users\eduar\Desktop\Soybe-main\data\sem_fundo
+Arquivo de pesos: C:\Users\eduar\Desktop\Soybe-main\models\soybean_model_efficientnetb0_20260409_132326.pth
+
+CONFIGURACAO
+------------------------------------------------------------------------
+batch_size: 8
+num_epochs: 20
+learning_rate: 0.0001
+fine_tune_learning_rate: 8e-05
+patience: 5
+train_split: 0.8
+val_split: 0.1
+seed: 42
+optimizer_name: AdamW
+weight_decay: 0.0001
+scheduler_factor: 0.5
+scheduler_patience: 2
+scheduler_min_lr: 1e-06
+accumulation_steps: 1
+freeze_backbone_epochs: 2
+
+RESULTADO FINAL
+------------------------------------------------------------------------
+accuracy: 93.64%
+best_val_loss: 0.228291
+total_time: 3852.2s
+num_classes: 8
+class_names: RGB_JPG_CHOCHOS_SF, RGB_JPG_ESVERDEADO_SF, RGB_JPG_IMPUREZAS_SF, RGB_JPG_INSETOS_SF, RGB_JPG_MAMONAS_SF, RGB_JPG_Normais_SF, RGB_JPG_PURPURAS_SF, RGB_JPG_QUEBRADOS_SF
+
+RUNTIME
+------------------------------------------------------------------------
+device: cuda
+num_workers: 0
+pin_memory: True
+mixed_precision: True
+optimizer: AdamW
+scheduler: ReduceLROnPlateau
+input_size: 224
+effective_batch_size: 8
+
+METRICAS POR CLASSE
+------------------------------------------------------------------------
+RGB_JPG_CHOCHOS_SF: precision=84.25% | recall=81.02% | f1=82.60% | support=548
+RGB_JPG_ESVERDEADO_SF: precision=62.34% | recall=80.00% | f1=70.07% | support=120
+RGB_JPG_IMPUREZAS_SF: precision=99.71% | recall=99.86% | f1=99.79% | support=1396
+RGB_JPG_INSETOS_SF: precision=75.00% | recall=50.00% | f1=60.00% | support=24
+RGB_JPG_MAMONAS_SF: precision=80.00% | recall=98.11% | f1=88.14% | support=53
+RGB_JPG_Normais_SF: precision=95.74% | recall=94.37% | f1=95.05% | support=2026
+RGB_JPG_PURPURAS_SF: precision=70.83% | recall=91.89% | f1=80.00% | support=37
+RGB_JPG_QUEBRADOS_SF: precision=92.64% | recall=92.50% | f1=92.57% | support=640
+
+MATRIZ DE CONFUSAO
+------------------------------------------------------------------------
+444 39 2 0 6 41 8 8
+15 96 1 0 1 4 0 3
+0 0 1394 0 2 0 0 0
+3 0 0 12 0 8 1 0
+0 0 0 0 52 1 0 0
+53 13 0 4 3 1912 5 36
+1 0 0 0 0 2 34 0
+11 6 1 0 1 29 0 592
+
+ROC AUC POR CLASSE
+------------------------------------------------------------------------
+RGB_JPG_CHOCHOS_SF: auc=0.9875
+RGB_JPG_ESVERDEADO_SF: auc=0.9858
+RGB_JPG_IMPUREZAS_SF: auc=0.9999
+RGB_JPG_INSETOS_SF: auc=0.9982
+RGB_JPG_MAMONAS_SF: auc=0.9811
+RGB_JPG_Normais_SF: auc=0.9938
+RGB_JPG_PURPURAS_SF: auc=0.9976
+RGB_JPG_QUEBRADOS_SF: auc=0.9955
+
+HISTORICO POR EPOCA
+------------------------------------------------------------------------
+epoch=1 | phase=head | train_loss=0.985262 | val_loss=0.743821 | lr=0.00010000 | elapsed=181.1s
+epoch=2 | phase=head | train_loss=0.770386 | val_loss=0.634871 | lr=0.00010000 | elapsed=345.1s
+epoch=3 | phase=full | train_loss=0.496831 | val_loss=0.322297 | lr=0.00008000 | elapsed=659.8s
+epoch=4 | phase=full | train_loss=0.364848 | val_loss=0.300090 | lr=0.00008000 | elapsed=916.6s
+epoch=5 | phase=full | train_loss=0.318396 | val_loss=0.294484 | lr=0.00008000 | elapsed=1174.9s
+epoch=6 | phase=full | train_loss=0.288033 | val_loss=0.265838 | lr=0.00008000 | elapsed=1431.4s
+epoch=7 | phase=full | train_loss=0.256540 | val_loss=0.289224 | lr=0.00008000 | elapsed=1687.7s
+epoch=8 | phase=full | train_loss=0.236861 | val_loss=0.247206 | lr=0.00008000 | elapsed=1946.0s
+epoch=9 | phase=full | train_loss=0.222138 | val_loss=0.228455 | lr=0.00008000 | elapsed=2203.9s
+epoch=10 | phase=full | train_loss=0.205690 | val_loss=0.228291 | lr=0.00008000 | elapsed=2466.5s
+epoch=11 | phase=full | train_loss=0.193404 | val_loss=0.248721 | lr=0.00008000 | elapsed=2736.7s
+epoch=12 | phase=full | train_loss=0.181109 | val_loss=0.245880 | lr=0.00008000 | elapsed=2999.4s
+epoch=13 | phase=full | train_loss=0.167610 | val_loss=0.320111 | lr=0.00004000 | elapsed=3263.8s
+epoch=14 | phase=full | train_loss=0.136318 | val_loss=0.251956 | lr=0.00004000 | elapsed=3544.3s
+epoch=15 | phase=full | train_loss=0.124413 | val_loss=0.251212 | lr=0.00004000 | elapsed=3833.6s
