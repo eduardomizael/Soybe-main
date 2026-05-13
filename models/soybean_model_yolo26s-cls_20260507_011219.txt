@@ -1,0 +1,59 @@
+RELATORIO DE TREINAMENTO YOLO
+========================================================================
+Gerado em: 2026-05-07T01:12:19
+Modelo: YOLO26s-cls
+Pesos iniciais: yolo26s-cls.pt
+Dataset YOLO: C:\Users\eduar\Desktop\Soybe-main\data\_yolo_cls\sem_fundo
+Best weights: C:\Users\eduar\Desktop\Soybe-main\models\yolo_runs\soybean_yolo26s-cls_20260506_233344\weights\best.pt
+
+CONFIGURACAO
+------------------------------------------------------------------------
+batch_size: 12
+num_epochs: 30
+imgsz: 224
+patience: 6
+seed: 42
+device: 0
+workers: 0
+
+SPLIT POR CLASSE
+------------------------------------------------------------------------
+RGB_JPG_CHOCHOS_SF: train=4328 | val=541 | test=542
+RGB_JPG_ESVERDEADO_SF: train=953 | val=119 | test=120
+RGB_JPG_IMPUREZAS_SF: train=11063 | val=1382 | test=1384
+RGB_JPG_INSETOS_SF: train=192 | val=24 | test=24
+RGB_JPG_MAMONAS_SF: train=443 | val=55 | test=56
+RGB_JPG_Normais_SF: train=16184 | val=2023 | test=2024
+RGB_JPG_PURPURAS_SF: train=317 | val=39 | test=41
+RGB_JPG_QUEBRADOS_SF: train=5262 | val=657 | test=659
+
+METRICAS
+------------------------------------------------------------------------
+top1: 0.944628119468689
+top5: 1.0
+accuracy_test: 94.33%
+test_images: 4850
+avg_inference_ms: 3.018
+run_dir: C:\Users\eduar\Desktop\Soybe-main\models\yolo_runs\soybean_yolo26s-cls_20260506_233344
+
+METRICAS POR CLASSE
+------------------------------------------------------------------------
+RGB_JPG_CHOCHOS_SF: precision=82.58% | recall=83.95% | f1=83.26% | support=542
+RGB_JPG_ESVERDEADO_SF: precision=77.19% | recall=73.33% | f1=75.21% | support=120
+RGB_JPG_IMPUREZAS_SF: precision=99.57% | recall=99.86% | f1=99.71% | support=1384
+RGB_JPG_INSETOS_SF: precision=72.22% | recall=54.17% | f1=61.90% | support=24
+RGB_JPG_MAMONAS_SF: precision=98.25% | recall=100.00% | f1=99.12% | support=56
+RGB_JPG_Normais_SF: precision=94.38% | recall=97.04% | f1=95.69% | support=2024
+RGB_JPG_PURPURAS_SF: precision=77.27% | recall=82.93% | f1=80.00% | support=41
+RGB_JPG_QUEBRADOS_SF: precision=97.65% | recall=88.47% | f1=92.83% | support=659
+
+MATRIZ DE CONFUSAO
+------------------------------------------------------------------------
+455 17 2 3 0 53 5 7
+23 88 1 0 0 6 0 2
+0 0 1382 0 0 1 0 1
+2 0 0 13 0 8 1 0
+0 0 0 0 56 0 0 0
+46 4 1 1 0 1964 4 4
+3 0 0 1 0 3 34 0
+22 5 2 0 1 46 0 583
