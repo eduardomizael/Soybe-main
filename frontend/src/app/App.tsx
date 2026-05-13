@@ -9,7 +9,7 @@ import { Dashboard } from "./components/Dashboard";
 import { TrainingDashboard } from "./components/TrainingDashboard";
 import { Button } from "./components/ui/button";
 import { Loader2Icon, SproutIcon, StopCircleIcon, Trash } from "lucide-react";
-import { toast } from "sonner";
+import { toast, Toaster } from "sonner";
 import { handleClassify } from "./components/ModelPipeline";
 
 type ApiResultItem = {
@@ -40,15 +40,13 @@ function App() {
   };
 
   const runClassification = async () => {
+    if (!selectedModel || selectedFiles.length === 0) return;
 
     const controller = new AbortController();
     // Salvar oo estado do controller
     setAbortController(controller);
 
     // Spinner de carregamento
-    setIsClassifying(true);
-
-    if (!selectedModel || selectedFiles.length === 0) return;
     setIsClassifying(true);
 
     try {
@@ -239,6 +237,7 @@ const clearSelection = () => {
           )}
         </div>
       </div>
+      <Toaster richColors position="top-right" />
     </div>
   );
 }
