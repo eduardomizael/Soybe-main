@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ZapIcon, TargetIcon, RocketIcon, LayersIcon, SmartphoneIcon, ClockIcon, StarIcon } from "lucide-react";
+import { ZapIcon, TargetIcon, RocketIcon, LayersIcon, SmartphoneIcon, ClockIcon, StarIcon, CpuIcon } from "lucide-react";
 
 interface ModelSelectorProps {
   value: string;
@@ -28,6 +28,14 @@ export default function ModelSelector({ value, onChange, version, onVersionChang
       icon: TargetIcon,
       color: "text-blue-500",
       bgHover: "hover:bg-blue-50" 
+    },
+    {
+      id: "EfficientNetB3",
+      name: "EfficientNet-B3",
+      description: "Mais Profundidade",
+      icon: CpuIcon,
+      color: "text-cyan-500",
+      bgHover: "hover:bg-cyan-50"
     },
     { 
       id: "EfficientNetB7", 
@@ -65,7 +73,7 @@ export default function ModelSelector({ value, onChange, version, onVersionChang
 
     setIsLoadingVersions(true);
     // VITE_API_URL || 8001 fallback
-    const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8001";
+    const baseUrl = (import.meta.env.VITE_API_URL || "http://localhost:8001").replace(/\/$/, "");
     fetch(`${baseUrl}/training/model_versions/${value}`)
       .then(res => res.json())
       .then(data => {

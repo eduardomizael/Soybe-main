@@ -24,6 +24,7 @@ import torchvision
 from torchvision.models import (
     EfficientNet_B0_Weights,
     EfficientNet_B2_Weights,
+    EfficientNet_B3_Weights,
     EfficientNet_B7_Weights,
     ResNet50_Weights,
     MobileNet_V3_Large_Weights,
@@ -44,6 +45,14 @@ TRAINING_MODEL_CONFIGS = {
         "builder": torchvision.models.efficientnet_b2,
         "weights": EfficientNet_B2_Weights.IMAGENET1K_V1,
         "input_size": 260,
+        "classifier_type": "sequential",
+        "default_batch": 16,
+        "cpu_batch": 4,
+    },
+    "EfficientNetB3": {
+        "builder": torchvision.models.efficientnet_b3,
+        "weights": EfficientNet_B3_Weights.IMAGENET1K_V1,
+        "input_size": 300,
         "classifier_type": "sequential",
         "default_batch": 16,
         "cpu_batch": 4,

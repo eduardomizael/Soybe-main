@@ -40,6 +40,28 @@ MODEL_CONFIGS = {
             os.path.join(PROJECT_ROOT, "network/models/efficientnet.pth"),
             os.path.join(PROJECT_ROOT, "models/efficientnet_b0.pth"),
             os.path.join(WORKSPACE_ROOT, "models/soybean_model_efficientnetb0.pth"),
+            os.path.join(WORKSPACE_ROOT, "models/soybean_model_efficientnet_b0.pth"),
+            os.path.join(WORKSPACE_ROOT, "models/efficientnet_b0.pth"),
+        ],
+    },
+    "EfficientNetB2": {
+        "builder": models.efficientnet_b2,
+        "input_size": 260,
+        "classifier_attr": "classifier",
+        "weight_candidates": [
+            os.path.join(WORKSPACE_ROOT, "models/soybean_model_efficientnetb2.pth"),
+            os.path.join(WORKSPACE_ROOT, "models/soybean_model_efficientnet_b2.pth"),
+            os.path.join(WORKSPACE_ROOT, "models/efficientnet_b2.pth"),
+        ],
+    },
+    "EfficientNetB3": {
+        "builder": models.efficientnet_b3,
+        "input_size": 300,
+        "classifier_attr": "classifier",
+        "weight_candidates": [
+            os.path.join(WORKSPACE_ROOT, "models/soybean_model_efficientnetb3.pth"),
+            os.path.join(WORKSPACE_ROOT, "models/soybean_model_efficientnet_b3.pth"),
+            os.path.join(WORKSPACE_ROOT, "models/efficientnet_b3.pth"),
         ],
     },
     "EfficientNetB7": {
@@ -50,6 +72,7 @@ MODEL_CONFIGS = {
             os.path.join(PROJECT_ROOT, "network/models/efficientnet_b7.pth"),
             os.path.join(WORKSPACE_ROOT, "models/soybean_model_efficientnet_b7.pth"),
             os.path.join(WORKSPACE_ROOT, "models/soybean_model_efficientnetb7.pth"),
+            os.path.join(WORKSPACE_ROOT, "models/efficientnet_b7.pth"),
         ],
     },
     "ResNet50": {
@@ -59,6 +82,7 @@ MODEL_CONFIGS = {
         "weight_candidates": [
             os.path.join(PROJECT_ROOT, "network/models/resnet50.pth"),
             os.path.join(WORKSPACE_ROOT, "models/soybean_model_resnet50.pth"),
+            os.path.join(WORKSPACE_ROOT, "models/resnet50.pth"),
         ],
     },
     "MobileNetV3": {
@@ -69,6 +93,7 @@ MODEL_CONFIGS = {
             os.path.join(PROJECT_ROOT, "network/models/mobilenet_v3.pth"),
             os.path.join(WORKSPACE_ROOT, "models/soybean_model_mobilenet_v3.pth"),
             os.path.join(WORKSPACE_ROOT, "models/soybean_model_mobilenetv3.pth"),
+            os.path.join(WORKSPACE_ROOT, "models/mobilenet_v3.pth"),
         ],
     },
 }
