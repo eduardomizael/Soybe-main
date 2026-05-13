@@ -17,7 +17,7 @@ from typing import Callable, Optional
 import torch
 import numpy as np
 from torch import nn, optim
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, Subset, WeightedRandomSampler, random_split
 from torchvision.datasets import ImageFolder
 import torchvision.transforms as T
 import torchvision
@@ -202,6 +202,106 @@ class TransformSubset(torch.utils.data.Dataset):
         return len(self.subset)
 
 
+def _split_class_indices(
+    indices: list[int],
+    train_split: float,
+    val_split: float,
+) -> tuple[list[int], list[int], list[int]]:
+    n_items = len(indices)
+    if n_items < 3:
+        raise ValueError(
+            "Split estratificado exige pelo menos 3 imagens por classe. "
+            f"Classe com {n_items} imagem(ns) encontrada."
+        )
+
+    test_split = 1.0 - train_split - val_split
+    val_count = max(1, int(round(val_split * n_items)))
+    test_count = max(1, int(round(test_split * n_items)))
+    train_count = n_items - val_count - test_count
+
+    while train_count < 1 and (val_count > 1 or test_count > 1):
+        if val_count >= test_count and val_count > 1:
+            val_count -= 1
+        elif test_count > 1:
+            test_count -= 1
+        train_count = n_items - val_count - test_count
+
+    if train_count < 1:
+        raise ValueError(
+            "Nao foi possivel criar split estratificado com pelo menos uma "
+            f"amostra de treino para classe com {n_items} imagem(ns)."
+        )
+
+    train_end = train_count
+    val_end = train_end + val_count
+    return indices[:train_end], indices[train_end:val_end], indices[val_end:]
+
+
+def _stratified_split(
+    dataset: ImageFolder,
+    num_classes: int,
+    train_split: float,
+    val_split: float,
+    seed: int,
+) -> tuple[Subset, Subset, Subset]:
+    rng = np.random.default_rng(seed)
+    targets = np.array(dataset.targets)
+    train_indices: list[int] = []
+    val_indices: list[int] = []
+    test_indices: list[int] = []
+
+    for class_idx in range(num_classes):
+        class_indices = np.where(targets == class_idx)[0].tolist()
+        rng.shuffle(class_indices)
+        cls_train, cls_val, cls_test = _split_class_indices(
+            class_indices,
+            train_split,
+            val_split,
+        )
+        train_indices.extend(cls_train)
+        val_indices.extend(cls_val)
+        test_indices.extend(cls_test)
+
+    rng.shuffle(train_indices)
+    rng.shuffle(val_indices)
+    rng.shuffle(test_indices)
+    return (
+        Subset(dataset, train_indices),
+        Subset(dataset, val_indices),
+        Subset(dataset, test_indices),
+    )
+
+
+def _macro_f1_score(labels: list[int], preds: list[int], num_classes: int) -> float:
+    labels_np = np.asarray(labels)
+    preds_np = np.asarray(preds)
+    f1_scores = []
+
+    for class_idx in range(num_classes):
+        true_positive = np.sum((preds_np == class_idx) & (labels_np == class_idx))
+        false_positive = np.sum((preds_np == class_idx) & (labels_np != class_idx))
+        false_negative = np.sum((preds_np != class_idx) & (labels_np == class_idx))
+
+        precision_den = true_positive + false_positive
+        recall_den = true_positive + false_negative
+        precision = true_positive / precision_den if precision_den else 0.0
+        recall = true_positive / recall_den if recall_den else 0.0
+        f1 = (
+            2 * precision * recall / (precision + recall)
+            if precision + recall
+            else 0.0
+        )
+        f1_scores.append(f1)
+
+    return float(np.mean(f1_scores)) if f1_scores else 0.0
+
+
+def _is_checkpoint_improved(metric_name: str, current: float, best: float) -> bool:
+    if metric_name == "val_loss":
+        return current < best
+    return current > best
+
+
 def _build_train_transforms(input_size: int):
     """Transforms agressivos exclusivos para treinamento (lida com desbalanceamento)."""
     return T.Compose([
@@ -381,6 +481,9 @@ class TrainingManager:
         num_epochs = config.get("num_epochs", 20)
         patience = config.get("patience", 5)
         early_stopping = bool(config.get("early_stopping", True))
+        split_strategy = config.get("split_strategy", "random")
+        checkpoint_metric = config.get("checkpoint_metric", "val_loss")
+        sampler_strategy = config.get("sampler_strategy", "shuffle")
         train_split = config.get("train_split", 0.8)
         val_split = config.get("val_split", 0.1)
         seed = int(config.get("seed", 42))
@@ -393,6 +496,21 @@ class TrainingManager:
 
         if model_name not in TRAINING_MODEL_CONFIGS:
             raise ValueError(f"Modelo '{model_name}' não suportado.")
+        if split_strategy not in {"random", "stratified"}:
+            raise ValueError(
+                "split_strategy deve ser 'random' ou 'stratified'. "
+                f"Recebido: {split_strategy}"
+            )
+        if checkpoint_metric not in {"val_loss", "val_accuracy", "val_macro_f1"}:
+            raise ValueError(
+                "checkpoint_metric deve ser 'val_loss', 'val_accuracy' ou "
+                f"'val_macro_f1'. Recebido: {checkpoint_metric}"
+            )
+        if sampler_strategy not in {"shuffle", "weighted"}:
+            raise ValueError(
+                "sampler_strategy deve ser 'shuffle' ou 'weighted'. "
+                f"Recebido: {sampler_strategy}"
+            )
 
         cfg = TRAINING_MODEL_CONFIGS[model_name]
         _set_seed(seed)
@@ -429,10 +547,22 @@ class TrainingManager:
                 f"Dataset muito pequeno ({total} imagens) para os splits configurados."
             )
 
-        split_generator = torch.Generator().manual_seed(seed)
-        train_ds_raw, val_ds_raw, test_ds_raw = random_split(
-            dataset, [train_size, val_size, test_size], generator=split_generator
-        )
+        if split_strategy == "stratified":
+            train_ds_raw, val_ds_raw, test_ds_raw = _stratified_split(
+                dataset,
+                num_classes,
+                train_split,
+                val_split,
+                seed,
+            )
+            train_size = len(train_ds_raw)
+            val_size = len(val_ds_raw)
+            test_size = len(test_ds_raw)
+        else:
+            split_generator = torch.Generator().manual_seed(seed)
+            train_ds_raw, val_ds_raw, test_ds_raw = random_split(
+                dataset, [train_size, val_size, test_size], generator=split_generator
+            )
 
         train_transforms = _build_train_transforms(cfg["input_size"])
         val_transforms = _build_val_transforms(cfg["input_size"])
@@ -451,6 +581,7 @@ class TrainingManager:
         weights = 1.0 / np.sqrt(class_counts + 1e-8)
         weights = (weights / np.sum(weights)) * num_classes
         class_weights = torch.FloatTensor(weights).to(device)
+        sample_weights = torch.DoubleTensor([weights[target] for target in targets])
 
         loader_kwargs = dict(
             num_workers=num_workers,
@@ -459,9 +590,22 @@ class TrainingManager:
             prefetch_factor=prefetch_factor if num_workers > 0 else None,
         )
 
-        train_loader = DataLoader(
-            train_ds, batch_size=batch_size, shuffle=True, **loader_kwargs
-        )
+        if sampler_strategy == "weighted":
+            train_sampler = WeightedRandomSampler(
+                weights=sample_weights,
+                num_samples=len(sample_weights),
+                replacement=True,
+            )
+            train_loader = DataLoader(
+                train_ds,
+                batch_size=batch_size,
+                sampler=train_sampler,
+                **loader_kwargs,
+            )
+        else:
+            train_loader = DataLoader(
+                train_ds, batch_size=batch_size, shuffle=True, **loader_kwargs
+            )
         val_loader = DataLoader(
             val_ds, batch_size=batch_size, shuffle=False, **loader_kwargs
         )
@@ -490,9 +634,14 @@ class TrainingManager:
 
         # ── Training loop ──
         best_val_loss = float("inf")
+        best_checkpoint_score = (
+            float("inf") if checkpoint_metric == "val_loss" else float("-inf")
+        )
+        best_epoch = 0
         epochs_no_improve = 0
         total_batches = len(train_loader)
         start_time = time.time()
+        train_images_seen = 0
         epoch_history = []
         current_phase = "head" if freeze_backbone_epochs > 0 else "full"
         phase_switched = False
@@ -581,6 +730,7 @@ class TrainingManager:
                     scaler.update()
                     optimizer.zero_grad(set_to_none=True)
                 running_loss += loss.item()
+                train_images_seen += int(data.size(0))
 
                 # Progresso por batch (a cada 5 batches para não sobrecarregar)
                 if (batch_idx + 1) % max(1, total_batches // 10) == 0 or batch_idx == total_batches - 1:
@@ -602,6 +752,8 @@ class TrainingManager:
             # ── Validação ──
             model.eval()
             val_loss = 0.0
+            val_preds = []
+            val_labels = []
             with torch.no_grad():
                 for data, targets in val_loader:
                     data = data.to(device, non_blocking=pin_memory)
@@ -609,8 +761,22 @@ class TrainingManager:
                     outputs = model(data)
                     loss = criterion(outputs, targets)
                     val_loss += loss.item()
+                    _, preds = torch.max(outputs, 1)
+                    val_preds.extend(preds.cpu().numpy())
+                    val_labels.extend(targets.cpu().numpy())
 
             epoch_val_loss = val_loss / len(val_loader)
+            epoch_val_accuracy = (
+                float(np.mean(np.asarray(val_preds) == np.asarray(val_labels)))
+                if val_labels
+                else 0.0
+            )
+            epoch_val_macro_f1 = _macro_f1_score(val_labels, val_preds, num_classes)
+            checkpoint_score = {
+                "val_loss": epoch_val_loss,
+                "val_accuracy": epoch_val_accuracy,
+                "val_macro_f1": epoch_val_macro_f1,
+            }[checkpoint_metric]
             elapsed = time.time() - start_time
             scheduler.step(epoch_val_loss)
             current_lr = float(optimizer.param_groups[0]["lr"])
@@ -620,6 +786,9 @@ class TrainingManager:
                 "phase": current_phase,
                 "train_loss": round(epoch_train_loss, 6),
                 "val_loss": round(epoch_val_loss, 6),
+                "val_accuracy": round(epoch_val_accuracy * 100, 4),
+                "val_macro_f1": round(epoch_val_macro_f1 * 100, 4),
+                "checkpoint_score": round(checkpoint_score, 6),
                 "learning_rate": current_lr,
                 "elapsed_seconds": round(elapsed, 1),
             })
@@ -630,19 +799,35 @@ class TrainingManager:
                 "total_epochs": num_epochs,
                 "train_loss": round(epoch_train_loss, 6),
                 "val_loss": round(epoch_val_loss, 6),
+                "val_accuracy": round(epoch_val_accuracy * 100, 4),
+                "val_macro_f1": round(epoch_val_macro_f1 * 100, 4),
+                "checkpoint_metric": checkpoint_metric,
+                "checkpoint_score": round(checkpoint_score, 6),
                 "elapsed_seconds": round(elapsed, 1),
                 "learning_rate": current_lr,
                 "phase": current_phase,
             })
 
-            # ── Early stopping ──
+            # ── Checkpoint / early stopping ──
             if epoch_val_loss < best_val_loss:
                 best_val_loss = epoch_val_loss
+
+            if _is_checkpoint_improved(
+                checkpoint_metric, checkpoint_score, best_checkpoint_score
+            ):
+                best_checkpoint_score = checkpoint_score
+                best_epoch = epoch + 1
                 epochs_no_improve = 0
                 checkpoint = {
                     "state_dict": model.state_dict(),
                     "class_names": class_names,
-                    "num_classes": num_classes
+                    "num_classes": num_classes,
+                    "checkpoint_metric": checkpoint_metric,
+                    "checkpoint_score": checkpoint_score,
+                    "epoch": best_epoch,
+                    "val_loss": epoch_val_loss,
+                    "val_accuracy": epoch_val_accuracy,
+                    "val_macro_f1": epoch_val_macro_f1,
                 }
                 torch.save(checkpoint, save_path)
                 has_saved_checkpoint = True
@@ -673,10 +858,10 @@ class TrainingManager:
         all_labels = []
         all_probs = []
 
+        eval_started_at = time.time()
         with torch.no_grad():
             for images, labels in test_loader:
                 images = images.to(device, non_blocking=pin_memory)
-                labels_dev = labels.to(device, non_blocking=pin_memory)
                 outputs = model(images)
                 
                 probs = torch.softmax(outputs, dim=1)
@@ -685,6 +870,7 @@ class TrainingManager:
                 all_preds.extend(preds.cpu().numpy())
                 all_labels.extend(labels.numpy())
                 all_probs.extend(probs.cpu().numpy())
+        eval_time = time.time() - eval_started_at
 
         # Classification report
         report = classification_report(
@@ -696,6 +882,7 @@ class TrainingManager:
 
         # Accuracy
         accuracy = report.get("accuracy", 0.0)
+        macro_f1 = report.get("macro avg", {}).get("f1-score", 0.0)
 
         # Per-class metrics
         per_class = []
@@ -739,12 +926,25 @@ class TrainingManager:
                 })
 
         total_time = time.time() - start_time
+        parameter_count = sum(p.numel() for p in model.parameters())
+        trainable_parameter_count = sum(
+            p.numel() for p in model.parameters() if p.requires_grad
+        )
+        model_size_mb = (
+            os.path.getsize(save_path) / (1024 * 1024)
+            if os.path.exists(save_path)
+            else 0.0
+        )
 
         result = {
             "type": "training_complete",
             "total_time": round(total_time, 1),
             "best_val_loss": round(best_val_loss, 6),
+            "best_checkpoint_metric": checkpoint_metric,
+            "best_checkpoint_score": round(best_checkpoint_score, 6),
+            "best_epoch": best_epoch,
             "accuracy": round(accuracy * 100, 2),
+            "macro_f1": round(macro_f1 * 100, 2),
             "classification_report": per_class,
             "model_path": save_path,
             "num_classes": num_classes,
@@ -761,12 +961,29 @@ class TrainingManager:
                 "optimizer": config.get("optimizer_name", "AdamW"),
                 "scheduler": "ReduceLROnPlateau",
                 "early_stopping": early_stopping,
+                "split_strategy": split_strategy,
+                "checkpoint_metric": checkpoint_metric,
+                "sampler_strategy": sampler_strategy,
                 "seed": seed,
                 "accumulation_steps": accumulation_steps,
                 "effective_batch_size": batch_size * accumulation_steps,
                 "freeze_backbone_epochs": freeze_backbone_epochs,
                 "fine_tune_learning_rate": fine_tune_learning_rate,
                 "input_size": cfg["input_size"],
+            },
+            "efficiency": {
+                "train_images_seen": train_images_seen,
+                "train_images_per_second": round(train_images_seen / total_time, 4)
+                if total_time > 0
+                else 0.0,
+                "test_images": len(test_ds),
+                "test_eval_seconds": round(eval_time, 4),
+                "test_images_per_second": round(len(test_ds) / eval_time, 4)
+                if eval_time > 0
+                else 0.0,
+                "parameter_count": parameter_count,
+                "trainable_parameter_count": trainable_parameter_count,
+                "model_size_mb": round(model_size_mb, 4),
             },
         }
 

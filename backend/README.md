@@ -93,6 +93,9 @@ O servico de treinamento preserva:
 - pesos por classe;
 - `AdamW`;
 - scheduler `ReduceLROnPlateau`;
+- split configuravel entre `random` e `stratified`;
+- sampler configuravel entre `shuffle` e `weighted`;
+- criterio de checkpoint configuravel entre `val_loss`, `val_accuracy` e `val_macro_f1`;
 - treino em duas fases com congelamento de backbone;
 - gradient accumulation;
 - early stopping configuravel por job;
@@ -117,7 +120,19 @@ Para forcar um job a rodar ate `num_epochs`, use:
 "early_stopping": False
 ```
 
-Mesmo com early stopping desativado, o servico continua salvando o melhor checkpoint por `val_loss`.
+Mesmo com early stopping desativado, o servico continua salvando o melhor checkpoint pelo `checkpoint_metric` configurado.
+
+Para comparar modelos com uma configuracao mais adequada a datasets desbalanceados, use:
+
+```python
+"split_strategy": "stratified",
+"checkpoint_metric": "val_macro_f1",
+"sampler_strategy": "weighted"
+```
+
+Com `checkpoint_metric: "val_macro_f1"`, o melhor checkpoint passa a ser escolhido por macro F1 de validacao. O `val_loss` continua sendo registrado e usado pelo scheduler.
+
+Os resultados finais incluem o bloco `efficiency` com throughput de treino, throughput de teste, contagem de parametros e tamanho do checkpoint.
 
 Artefatos gerados em `models/`:
 

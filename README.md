@@ -231,10 +231,14 @@ O pipeline preserva recursos importantes do servico de treinamento:
 - seed fixa para reprodutibilidade;
 - `AdamW` com `weight_decay`;
 - `ReduceLROnPlateau`;
+- split configuravel (`random` ou `stratified`);
+- sampler de treino configuravel (`shuffle` ou `weighted`);
+- checkpoint configuravel por `val_loss`, `val_accuracy` ou `val_macro_f1`;
 - congelamento inicial de backbone;
 - gradient accumulation;
 - execucao opcional ate `num_epochs` com `early_stopping: False`;
 - tratamento de runtime para Windows;
+- metricas de eficiencia para comparar modelos;
 - relatorios individuais e resumo consolidado.
 
 ## Validacao

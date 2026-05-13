@@ -109,3 +109,29 @@ A melhoria mais recomendada para a proxima etapa e implementar:
 2. criterio de melhor checkpoint configuravel por `macro_f1`.
 
 Essas duas mudancas devem melhorar a confiabilidade da comparacao entre arquiteturas e beneficiar datasets desbalanceados.
+
+## Parametros Implementados Na Branch De Eficiencia
+
+As recomendacoes foram transformadas em parametros para permitir comparacao entre modelos:
+
+- `split_strategy`: aceita `random` ou `stratified`;
+- `checkpoint_metric`: aceita `val_loss`, `val_accuracy` ou `val_macro_f1`;
+- `sampler_strategy`: aceita `shuffle` ou `weighted`;
+- `early_stopping`: permite rodar ate `num_epochs` quando definido como `False`.
+
+A pipeline comparativa usa:
+
+```python
+"split_strategy": "stratified",
+"checkpoint_metric": "val_macro_f1",
+"sampler_strategy": "weighted",
+"early_stopping": False
+```
+
+Os resultados tambem passam a registrar metricas de eficiencia:
+
+- imagens de treino processadas por segundo;
+- imagens de teste avaliadas por segundo;
+- numero de parametros;
+- parametros treinaveis;
+- tamanho do checkpoint em MB.

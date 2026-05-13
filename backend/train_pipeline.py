@@ -34,6 +34,9 @@ PIPELINE: list[dict[str, Any]] = [
         "learning_rate": 1.5e-4,
         "fine_tune_learning_rate": 1e-4,
         "early_stopping": False,
+        "split_strategy": "stratified",
+        "checkpoint_metric": "val_macro_f1",
+        "sampler_strategy": "weighted",
         "patience": 5,
         "train_split": 0.8,
         "val_split": 0.1,
@@ -54,6 +57,9 @@ PIPELINE: list[dict[str, Any]] = [
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 8e-5,
         "early_stopping": False,
+        "split_strategy": "stratified",
+        "checkpoint_metric": "val_macro_f1",
+        "sampler_strategy": "weighted",
         "patience": 5,
         "train_split": 0.8,
         "val_split": 0.1,
@@ -74,6 +80,9 @@ PIPELINE: list[dict[str, Any]] = [
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 8e-5,
         "early_stopping": False,
+        "split_strategy": "stratified",
+        "checkpoint_metric": "val_macro_f1",
+        "sampler_strategy": "weighted",
         "patience": 5,
         "train_split": 0.8,
         "val_split": 0.1,
@@ -94,6 +103,9 @@ PIPELINE: list[dict[str, Any]] = [
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 7e-5,
         "early_stopping": False,
+        "split_strategy": "stratified",
+        "checkpoint_metric": "val_macro_f1",
+        "sampler_strategy": "weighted",
         "patience": 5,
         "train_split": 0.8,
         "val_split": 0.1,
@@ -114,6 +126,9 @@ PIPELINE: list[dict[str, Any]] = [
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 8e-5,
         "early_stopping": False,
+        "split_strategy": "stratified",
+        "checkpoint_metric": "val_macro_f1",
+        "sampler_strategy": "weighted",
         "patience": 5,
         "train_split": 0.8,
         "val_split": 0.1,
@@ -134,6 +149,9 @@ PIPELINE: list[dict[str, Any]] = [
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 5e-5,
         "early_stopping": False,
+        "split_strategy": "stratified",
+        "checkpoint_metric": "val_macro_f1",
+        "sampler_strategy": "weighted",
         "patience": 4,
         "train_split": 0.8,
         "val_split": 0.1,
@@ -169,6 +187,24 @@ def _validate_job(job: dict[str, Any]) -> dict[str, Any]:
     if train_split + val_split >= 0.95:
         raise ValueError(
             f"Splits inválidos para '{model_name}': train_split + val_split deve ser < 0.95."
+        )
+
+    split_strategy = job.get("split_strategy", "random")
+    if split_strategy not in {"random", "stratified"}:
+        raise ValueError(
+            f"split_strategy inválido para '{model_name}': {split_strategy}."
+        )
+
+    checkpoint_metric = job.get("checkpoint_metric", "val_loss")
+    if checkpoint_metric not in {"val_loss", "val_accuracy", "val_macro_f1"}:
+        raise ValueError(
+            f"checkpoint_metric inválido para '{model_name}': {checkpoint_metric}."
+        )
+
+    sampler_strategy = job.get("sampler_strategy", "shuffle")
+    if sampler_strategy not in {"shuffle", "weighted"}:
+        raise ValueError(
+            f"sampler_strategy inválido para '{model_name}': {sampler_strategy}."
         )
 
     normalized = dict(job)
@@ -226,6 +262,9 @@ def _build_progress_callback(job: dict[str, Any]):
                 f"[epoch] {message['epoch']}/{message['total_epochs']} | "
                 f"train_loss={message['train_loss']:.6f} | "
                 f"val_loss={message['val_loss']:.6f} | "
+                f"val_macro_f1={message.get('val_macro_f1', 0.0):.2f}% | "
+                f"checkpoint={message.get('checkpoint_metric', 'val_loss')}:"
+                f"{message.get('checkpoint_score', 0.0):.6f} | "
                 f"elapsed={message['elapsed_seconds']:.1f}s"
             )
             return
@@ -233,7 +272,9 @@ def _build_progress_callback(job: dict[str, Any]):
         if msg_type == "training_complete":
             print(
                 f"[done] accuracy={message['accuracy']:.2f}% | "
-                f"best_val_loss={message['best_val_loss']:.6f}"
+                f"macro_f1={message.get('macro_f1', 0.0):.2f}% | "
+                f"best_{message.get('best_checkpoint_metric', 'val_loss')}="
+                f"{message.get('best_checkpoint_score', 0.0):.6f}"
             )
             print(f"[model] {message['model_path']}")
             return
@@ -270,6 +311,9 @@ def _write_training_report(job: dict[str, Any], result: dict[str, Any]) -> Path:
     lines.append(f"learning_rate: {job['learning_rate']}")
     lines.append(f"fine_tune_learning_rate: {job.get('fine_tune_learning_rate', job['learning_rate'])}")
     lines.append(f"early_stopping: {job.get('early_stopping', True)}")
+    lines.append(f"split_strategy: {job.get('split_strategy', 'random')}")
+    lines.append(f"checkpoint_metric: {job.get('checkpoint_metric', 'val_loss')}")
+    lines.append(f"sampler_strategy: {job.get('sampler_strategy', 'shuffle')}")
     lines.append(f"patience: {job['patience']}")
     lines.append(f"train_split: {job['train_split']}")
     lines.append(f"val_split: {job['val_split']}")
@@ -285,7 +329,11 @@ def _write_training_report(job: dict[str, Any], result: dict[str, Any]) -> Path:
     lines.append("RESULTADO FINAL")
     lines.append("-" * 72)
     lines.append(f"accuracy: {result.get('accuracy', 0.0):.2f}%")
+    lines.append(f"macro_f1: {result.get('macro_f1', 0.0):.2f}%")
     lines.append(f"best_val_loss: {result.get('best_val_loss', 0.0):.6f}")
+    lines.append(f"best_checkpoint_metric: {result.get('best_checkpoint_metric', 'val_loss')}")
+    lines.append(f"best_checkpoint_score: {result.get('best_checkpoint_score', 0.0):.6f}")
+    lines.append(f"best_epoch: {result.get('best_epoch', 0)}")
     lines.append(f"total_time: {result.get('total_time', 0.0):.1f}s")
     lines.append(f"num_classes: {result.get('num_classes', 0)}")
     lines.append(f"class_names: {', '.join(result.get('class_names', []))}")
@@ -301,8 +349,31 @@ def _write_training_report(job: dict[str, Any], result: dict[str, Any]) -> Path:
         lines.append(f"mixed_precision: {runtime.get('mixed_precision', 'unknown')}")
         lines.append(f"optimizer: {runtime.get('optimizer', 'unknown')}")
         lines.append(f"scheduler: {runtime.get('scheduler', 'unknown')}")
+        lines.append(f"split_strategy: {runtime.get('split_strategy', 'unknown')}")
+        lines.append(f"checkpoint_metric: {runtime.get('checkpoint_metric', 'unknown')}")
+        lines.append(f"sampler_strategy: {runtime.get('sampler_strategy', 'unknown')}")
         lines.append(f"input_size: {runtime.get('input_size', 'unknown')}")
         lines.append(f"effective_batch_size: {runtime.get('effective_batch_size', 'unknown')}")
+
+    efficiency = result.get("efficiency", {})
+    if efficiency:
+        lines.append("")
+        lines.append("EFICIENCIA")
+        lines.append("-" * 72)
+        lines.append(f"train_images_seen: {efficiency.get('train_images_seen', 0)}")
+        lines.append(
+            f"train_images_per_second: {efficiency.get('train_images_per_second', 0.0):.4f}"
+        )
+        lines.append(f"test_images: {efficiency.get('test_images', 0)}")
+        lines.append(f"test_eval_seconds: {efficiency.get('test_eval_seconds', 0.0):.4f}")
+        lines.append(
+            f"test_images_per_second: {efficiency.get('test_images_per_second', 0.0):.4f}"
+        )
+        lines.append(f"parameter_count: {efficiency.get('parameter_count', 0)}")
+        lines.append(
+            f"trainable_parameter_count: {efficiency.get('trainable_parameter_count', 0)}"
+        )
+        lines.append(f"model_size_mb: {efficiency.get('model_size_mb', 0.0):.4f}")
 
     lines.append("")
     lines.append("METRICAS POR CLASSE")
@@ -339,6 +410,9 @@ def _write_training_report(job: dict[str, Any], result: dict[str, Any]) -> Path:
                 f"epoch={item['epoch']} | phase={item['phase']} | "
                 f"train_loss={item['train_loss']:.6f} | "
                 f"val_loss={item['val_loss']:.6f} | "
+                f"val_accuracy={item.get('val_accuracy', 0.0):.4f}% | "
+                f"val_macro_f1={item.get('val_macro_f1', 0.0):.4f}% | "
+                f"checkpoint_score={item.get('checkpoint_score', 0.0):.6f} | "
                 f"lr={item['learning_rate']:.8f} | "
                 f"elapsed={item['elapsed_seconds']:.1f}s"
             )
@@ -371,6 +445,9 @@ def _write_error_report(job: dict[str, Any], error_message: str) -> Path:
     lines.append(f"learning_rate: {job['learning_rate']}")
     lines.append(f"fine_tune_learning_rate: {job.get('fine_tune_learning_rate', job['learning_rate'])}")
     lines.append(f"early_stopping: {job.get('early_stopping', True)}")
+    lines.append(f"split_strategy: {job.get('split_strategy', 'random')}")
+    lines.append(f"checkpoint_metric: {job.get('checkpoint_metric', 'val_loss')}")
+    lines.append(f"sampler_strategy: {job.get('sampler_strategy', 'shuffle')}")
     lines.append(f"patience: {job['patience']}")
     lines.append(f"train_split: {job['train_split']}")
     lines.append(f"val_split: {job['val_split']}")
@@ -411,8 +488,15 @@ def _write_pipeline_summary(entries: list[dict[str, Any]]) -> Path:
         if entry["status"] == "success":
             lines.append(
                 f"accuracy={entry['accuracy']:.2f}% | "
+                f"macro_f1={entry['macro_f1']:.2f}% | "
                 f"best_val_loss={entry['best_val_loss']:.6f} | "
+                f"best_{entry['best_checkpoint_metric']}={entry['best_checkpoint_score']:.6f} | "
                 f"total_time={entry['total_time']:.1f}s"
+            )
+            lines.append(
+                f"train_images_per_second={entry['train_images_per_second']:.4f} | "
+                f"test_images_per_second={entry['test_images_per_second']:.4f} | "
+                f"model_size_mb={entry['model_size_mb']:.4f}"
             )
             lines.append(f"model_path={entry['model_path']}")
             lines.append(f"report_path={entry['report_path']}")
@@ -449,8 +533,18 @@ def main() -> int:
                     "data_path": job["data_path"],
                     "status": "success",
                     "accuracy": result.get("accuracy", 0.0),
+                    "macro_f1": result.get("macro_f1", 0.0),
                     "best_val_loss": result.get("best_val_loss", 0.0),
+                    "best_checkpoint_metric": result.get("best_checkpoint_metric", "val_loss"),
+                    "best_checkpoint_score": result.get("best_checkpoint_score", 0.0),
                     "total_time": result.get("total_time", 0.0),
+                    "train_images_per_second": result.get("efficiency", {}).get(
+                        "train_images_per_second", 0.0
+                    ),
+                    "test_images_per_second": result.get("efficiency", {}).get(
+                        "test_images_per_second", 0.0
+                    ),
+                    "model_size_mb": result.get("efficiency", {}).get("model_size_mb", 0.0),
                     "model_path": result.get("model_path", ""),
                     "report_path": str(report_path),
                 })

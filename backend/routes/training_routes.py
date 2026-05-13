@@ -135,6 +135,27 @@ def _validate_splits(train_split: float, val_split: float):
         )
 
 
+def _validate_training_options(config: TrainingConfig):
+    if config.split_strategy not in {"random", "stratified"}:
+        raise HTTPException(
+            status_code=400,
+            detail="split_strategy deve ser 'random' ou 'stratified'.",
+        )
+    if config.checkpoint_metric not in {"val_loss", "val_accuracy", "val_macro_f1"}:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "checkpoint_metric deve ser 'val_loss', 'val_accuracy' "
+                "ou 'val_macro_f1'."
+            ),
+        )
+    if config.sampler_strategy not in {"shuffle", "weighted"}:
+        raise HTTPException(
+            status_code=400,
+            detail="sampler_strategy deve ser 'shuffle' ou 'weighted'.",
+        )
+
+
 @router.post("/start")
 async def start_training(config: TrainingConfig):
     """Inicia treinamento com a configuração fornecida."""
@@ -144,6 +165,7 @@ async def start_training(config: TrainingConfig):
     # Validações de segurança
     validated_path = _validate_data_path(config.data_path)
     _validate_splits(config.train_split, config.val_split)
+    _validate_training_options(config)
 
     # Fix 3: get_running_loop() em vez de get_event_loop()
     loop = asyncio.get_running_loop()
@@ -158,9 +180,22 @@ async def start_training(config: TrainingConfig):
         "batch_size": config.batch_size,
         "num_epochs": config.num_epochs,
         "learning_rate": config.learning_rate,
+        "fine_tune_learning_rate": config.fine_tune_learning_rate or config.learning_rate,
         "patience": config.patience,
+        "early_stopping": config.early_stopping,
+        "split_strategy": config.split_strategy,
+        "checkpoint_metric": config.checkpoint_metric,
+        "sampler_strategy": config.sampler_strategy,
         "train_split": config.train_split,
         "val_split": config.val_split,
+        "seed": config.seed,
+        "optimizer_name": config.optimizer_name,
+        "weight_decay": config.weight_decay,
+        "scheduler_factor": config.scheduler_factor,
+        "scheduler_patience": config.scheduler_patience,
+        "scheduler_min_lr": config.scheduler_min_lr,
+        "accumulation_steps": config.accumulation_steps,
+        "freeze_backbone_epochs": config.freeze_backbone_epochs,
     }
 
     try:
