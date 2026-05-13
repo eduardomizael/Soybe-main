@@ -233,6 +233,7 @@ O pipeline preserva recursos importantes do servico de treinamento:
 - `ReduceLROnPlateau`;
 - congelamento inicial de backbone;
 - gradient accumulation;
+- execucao opcional ate `num_epochs` com `early_stopping: False`;
 - tratamento de runtime para Windows;
 - relatorios individuais e resumo consolidado.
 

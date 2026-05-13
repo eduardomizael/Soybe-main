@@ -380,6 +380,7 @@ class TrainingManager:
         batch_size = config.get("batch_size", 16)
         num_epochs = config.get("num_epochs", 20)
         patience = config.get("patience", 5)
+        early_stopping = bool(config.get("early_stopping", True))
         train_split = config.get("train_split", 0.8)
         val_split = config.get("val_split", 0.1)
         seed = int(config.get("seed", 42))
@@ -647,7 +648,7 @@ class TrainingManager:
                 has_saved_checkpoint = True
             else:
                 epochs_no_improve += 1
-                if epochs_no_improve >= patience:
+                if early_stopping and epochs_no_improve >= patience:
                     callback({
                         "type": "status",
                         "message": f"Early stopping na epoch {epoch + 1}",
@@ -759,6 +760,7 @@ class TrainingManager:
                 "mixed_precision": use_amp,
                 "optimizer": config.get("optimizer_name", "AdamW"),
                 "scheduler": "ReduceLROnPlateau",
+                "early_stopping": early_stopping,
                 "seed": seed,
                 "accumulation_steps": accumulation_steps,
                 "effective_batch_size": batch_size * accumulation_steps,

@@ -33,6 +33,7 @@ PIPELINE: list[dict[str, Any]] = [
         "num_epochs": 20,
         "learning_rate": 1.5e-4,
         "fine_tune_learning_rate": 1e-4,
+        "early_stopping": False,
         "patience": 5,
         "train_split": 0.8,
         "val_split": 0.1,
@@ -52,6 +53,7 @@ PIPELINE: list[dict[str, Any]] = [
         "num_epochs": 20,
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 8e-5,
+        "early_stopping": False,
         "patience": 5,
         "train_split": 0.8,
         "val_split": 0.1,
@@ -71,6 +73,7 @@ PIPELINE: list[dict[str, Any]] = [
         "num_epochs": 20,
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 8e-5,
+        "early_stopping": False,
         "patience": 5,
         "train_split": 0.8,
         "val_split": 0.1,
@@ -84,12 +87,33 @@ PIPELINE: list[dict[str, Any]] = [
         "freeze_backbone_epochs": 2,
     },
     {
+        "model_name": "EfficientNetB3",
+        "data_path": str(DATA_ROOT / "sem_fundo"),
+        "batch_size": 4,
+        "num_epochs": 20,
+        "learning_rate": 1e-4,
+        "fine_tune_learning_rate": 7e-5,
+        "early_stopping": False,
+        "patience": 5,
+        "train_split": 0.8,
+        "val_split": 0.1,
+        "seed": 42,
+        "optimizer_name": "AdamW",
+        "weight_decay": 1e-4,
+        "scheduler_factor": 0.5,
+        "scheduler_patience": 2,
+        "scheduler_min_lr": 1e-6,
+        "accumulation_steps": 2,
+        "freeze_backbone_epochs": 2,
+    },
+    {
         "model_name": "ResNet50",
         "data_path": str(DATA_ROOT / "sem_fundo"),
         "batch_size": 4,
         "num_epochs": 20,
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 8e-5,
+        "early_stopping": False,
         "patience": 5,
         "train_split": 0.8,
         "val_split": 0.1,
@@ -109,6 +133,7 @@ PIPELINE: list[dict[str, Any]] = [
         "num_epochs": 16,
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 5e-5,
+        "early_stopping": False,
         "patience": 4,
         "train_split": 0.8,
         "val_split": 0.1,
@@ -244,6 +269,7 @@ def _write_training_report(job: dict[str, Any], result: dict[str, Any]) -> Path:
     lines.append(f"num_epochs: {job['num_epochs']}")
     lines.append(f"learning_rate: {job['learning_rate']}")
     lines.append(f"fine_tune_learning_rate: {job.get('fine_tune_learning_rate', job['learning_rate'])}")
+    lines.append(f"early_stopping: {job.get('early_stopping', True)}")
     lines.append(f"patience: {job['patience']}")
     lines.append(f"train_split: {job['train_split']}")
     lines.append(f"val_split: {job['val_split']}")
@@ -344,6 +370,7 @@ def _write_error_report(job: dict[str, Any], error_message: str) -> Path:
     lines.append(f"num_epochs: {job['num_epochs']}")
     lines.append(f"learning_rate: {job['learning_rate']}")
     lines.append(f"fine_tune_learning_rate: {job.get('fine_tune_learning_rate', job['learning_rate'])}")
+    lines.append(f"early_stopping: {job.get('early_stopping', True)}")
     lines.append(f"patience: {job['patience']}")
     lines.append(f"train_split: {job['train_split']}")
     lines.append(f"val_split: {job['val_split']}")

@@ -95,7 +95,7 @@ O servico de treinamento preserva:
 - scheduler `ReduceLROnPlateau`;
 - treino em duas fases com congelamento de backbone;
 - gradient accumulation;
-- early stopping;
+- early stopping configuravel por job;
 - pausa, retomada, cancelamento e finalizacao antecipada;
 - import tardio de metricas pesadas;
 - ajuste de `DataLoader` para Windows;
@@ -110,6 +110,14 @@ python -m backend.train_pipeline
 ```
 
 Edite a lista `PIPELINE` em `backend/train_pipeline.py` antes de rodar.
+
+Para forcar um job a rodar ate `num_epochs`, use:
+
+```python
+"early_stopping": False
+```
+
+Mesmo com early stopping desativado, o servico continua salvando o melhor checkpoint por `val_loss`.
 
 Artefatos gerados em `models/`:
 
