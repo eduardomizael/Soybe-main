@@ -1,73 +1,125 @@
-# Backend (FastAPI)
+# Backend
 
-Este diretório contém a API de inferência usada pelo site.
+API FastAPI responsavel por inferencia, treinamento, historico de modelos e comunicacao em tempo real com o frontend.
 
-## Estrutura
+## Arquivos Principais
 
-- `main.py`: inicializa o `FastAPI`, configura CORS e expõe os endpoints (`/inferencia`, `/home`).
-- `routes/`: rotas opcionais e testes de inferência (não usado diretamente no fluxo atual).
-  - `inference_routes.py`: exemplo de rota e código auxiliar para teste com EfficientNet.
-- `schemas/`: modelos de dados da API (Pydantic).
-  - `inference_schema.py`: esquemas específicos de inferência.
-- `schemas.py`: esquemas principais retornados/recebidos pela API (`InferenceRequest`, `InferenceResponse`).
-- `services/`: camada de serviço que contém a lógica de negócio.
-  - `inference_service.py`: ponto de entrada para rodar a inferência a partir dos bytes do arquivo.
-- `documentation.txt`: notas internas de arquitetura e testes.
+- `main.py`: inicializa o app, configura CORS e registra rotas.
+- `schemas.py`: contratos Pydantic usados pela API.
+- `routes/inference_routes.py`: carregamento de pesos, transformacoes e inferencia por arquitetura.
+- `routes/training_routes.py`: endpoints REST e WebSocket do treinamento.
+- `services/inference_service.py`: entrada de negocio para inferencia.
+- `services/training_service.py`: motor de treinamento, avaliacao e persistencia de historico.
+- `train_pipeline.py`: execucao de treinamentos em lote via CLI.
 
-## Como executar
+## Executar API
 
-1. Instale dependências (usar o ambiente virtual do projeto):
+Na raiz do projeto:
 
 ```bash
-pip install -r requirements.txt
+.\.venv\Scripts\activate
+python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8001
 ```
 
-2. Suba o servidor de desenvolvimento:
+Em Linux/macOS:
 
 ```bash
-uvicorn backend.main:app --reload
+source .venv/bin/activate
+python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8001
 ```
 
+## Endpoints
+
+### Geral
+
+- `GET /home`: health check.
+- `POST /inferencia`: classifica uma ou mais imagens.
+
+`POST /inferencia` recebe `multipart/form-data`:
+
+- `model_name`: arquitetura, por exemplo `EfficientNetB3`;
+- `weight_filename`: opcional, nome do `.pth` dentro de `models/`;
+- `files`: lista de imagens.
+
+### Treinamento
+
+Prefixo: `/training`
+
+- `GET /models`: lista arquiteturas disponiveis.
+- `GET /datasets`: lista datasets detectados em `data/`.
+- `GET /status`: retorna estado do treinamento atual.
+- `GET /history`: retorna historico salvo em `models/training_history.json`.
+- `GET /model_versions/{model_name}`: lista pesos `.pth` existentes para uma arquitetura.
+- `POST /start`: inicia treinamento.
+- `POST /pause`: pausa treinamento.
+- `POST /resume`: retoma treinamento.
+- `POST /stop_early`: finaliza antecipadamente salvando o melhor checkpoint disponivel.
+- `POST /cancel`: cancela treinamento.
+- `WS /training/ws`: envia progresso em tempo real para o frontend.
+
+## Modelos
+
+Arquiteturas suportadas:
+
+- `EfficientNetB0`
+- `EfficientNetB2`
+- `EfficientNetB3`
+- `EfficientNetB7`
+- `ResNet50`
+- `MobileNetV3`
+
+Os pesos sao lidos de `models/` e, para compatibilidade, alguns caminhos legados em `backend/network/models/` tambem sao testados.
+
+## Dataset
+
+O treinamento usa `ImageFolder`. Estrutura esperada:
+
+```text
+data/
+  dataset_nome/
+    classe_a/
+      imagem_1.jpg
+    classe_b/
+      imagem_2.jpg
 ```
-PYTHONPATH=. uvicorn backend.main:app --reload --host 0.0.0.0 --port 8001
-```
 
-3. Endpoints:
-- `POST /inferencia`: recebe `model_name` e arquivos de imagem (multipart/form-data) em bytes.
-- `GET /home`: verificação de saúde da API
+O backend rejeita caminhos de dataset fora de `data/`.
 
-## Pipeline De Treinamento Via Script
+## Recursos Do Treinamento
 
-Também é possível executar treinamentos em sequência sem subir a API.
+O servico de treinamento preserva:
 
-1. Edite a lista `PIPELINE` em [backend/train_pipeline.py](/c:/Users/eduar/Desktop/Soybe-main/backend/train_pipeline.py) com os jobs desejados.
-2. Garanta que `data_path` aponte para um diretório dentro de `data/`.
-3. Execute:
+- seed fixa;
+- pesos por classe;
+- `AdamW`;
+- scheduler `ReduceLROnPlateau`;
+- treino em duas fases com congelamento de backbone;
+- gradient accumulation;
+- early stopping;
+- pausa, retomada, cancelamento e finalizacao antecipada;
+- import tardio de metricas pesadas;
+- ajuste de `DataLoader` para Windows;
+- historico por epoca e metadados de runtime.
+
+## Pipeline CLI
+
+Para executar treinamentos em sequencia:
 
 ```bash
 python -m backend.train_pipeline
 ```
 
-O script imprime no terminal:
-- status de preparação
-- progresso por batch
-- métricas por época
-- caminho do `.pth` salvo ao final de cada job
-
-O pipeline também suporta:
-- `AdamW` com `weight_decay`
-- `ReduceLROnPlateau`
-- `seed` fixa para reprodutibilidade
-- `freeze_backbone_epochs` para treino em duas fases
-- `accumulation_steps` para modelos pesados como `EfficientNetB7`
+Edite a lista `PIPELINE` em `backend/train_pipeline.py` antes de rodar.
 
 Artefatos gerados em `models/`:
-- um `.pth` por treinamento bem-sucedido
-- um `.txt` por treinamento com métricas, runtime e histórico por época
-- um `*_error.txt` para jobs que falharem
-- um `pipeline_summary_<timestamp>.txt` com o resumo consolidado da execução
 
-## Convenções
-- Importações internas devem usar o prefixo `backend.` (ex.: `from backend.services.inference_service import run_inference`).
-- Evite acessar modelos diretamente nas rotas: sempre passe pela camada `services/`.
-- `schemas.py` define contratos claros para entrada/saída.
+- `.pth` do modelo;
+- relatorio `.txt` por treinamento;
+- `*_error.txt` em falhas;
+- `pipeline_summary_<timestamp>.txt`.
+
+## Validacao
+
+```bash
+python -m compileall backend
+```
