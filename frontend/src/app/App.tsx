@@ -9,7 +9,7 @@ import { Dashboard } from "./components/Dashboard";
 import { TrainingDashboard } from "./components/TrainingDashboard";
 import { Button } from "./components/ui/button";
 import { Loader2Icon, SproutIcon, StopCircleIcon, Trash } from "lucide-react";
-import { toast } from "sonner";
+import { toast, Toaster } from "sonner";
 import { handleClassify } from "./components/ModelPipeline";
 
 type ApiResultItem = {
@@ -239,6 +239,7 @@ const clearSelection = () => {
           )}
         </div>
       </div>
+      <Toaster richColors position="top-right" />
     </div>
   );
 }

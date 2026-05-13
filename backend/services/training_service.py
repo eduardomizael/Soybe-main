@@ -6,8 +6,6 @@ via callback (consumido pelo WebSocket).
 """
 
 import os
-import random
-import sys
 import time
 import threading
 import json
@@ -24,10 +22,12 @@ import torchvision
 from torchvision.models import (
     EfficientNet_B0_Weights,
     EfficientNet_B2_Weights,
+    EfficientNet_B3_Weights,
     EfficientNet_B7_Weights,
     ResNet50_Weights,
     MobileNet_V3_Large_Weights,
 )
+from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc
 
 # ──────────────────────── Configuração de modelo ────────────────────────
 
@@ -44,6 +44,14 @@ TRAINING_MODEL_CONFIGS = {
         "builder": torchvision.models.efficientnet_b2,
         "weights": EfficientNet_B2_Weights.IMAGENET1K_V1,
         "input_size": 260,
+        "classifier_type": "sequential",
+        "default_batch": 16,
+        "cpu_batch": 4,
+    },
+    "EfficientNetB3": {
+        "builder": torchvision.models.efficientnet_b3,
+        "weights": EfficientNet_B3_Weights.IMAGENET1K_V1,
+        "input_size": 300,
         "classifier_type": "sequential",
         "default_batch": 16,
         "cpu_batch": 4,
@@ -84,7 +92,6 @@ def _configure_runtime():
     """Configura device e paralelismo CPU/GPU."""
     cpu_threads = os.cpu_count() or 1
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    is_windows = sys.platform.startswith("win")
 
     if device.type == "cuda":
         torch.backends.cudnn.benchmark = True
@@ -96,29 +103,16 @@ def _configure_runtime():
         except RuntimeError:
             pass  # já configurado
 
-    # No Windows, workers extras fazem spawn de novos processos que
-    # reimportam torch/sklearn/pandas e pressionam muito RAM/pagefile.
-    if is_windows:
-        num_workers = 0
-    else:
-        num_workers = (
-            min(4, max(1, cpu_threads // 4))
-            if device.type == "cpu"
-            else min(8, cpu_threads)
-        )
+    num_workers = (
+        min(4, max(1, cpu_threads // 4))
+        if device.type == "cpu"
+        else min(8, cpu_threads)
+    )
     pin_memory = device.type == "cuda"
     persistent_workers = device.type == "cuda" and num_workers > 0
     prefetch_factor = 1 if num_workers > 0 else 2
 
     return device, num_workers, pin_memory, persistent_workers, prefetch_factor
-
-
-def _set_seed(seed: int):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
 
 
 def _build_model(model_name: str, num_classes: int, device: torch.device):
@@ -138,43 +132,6 @@ def _build_model(model_name: str, num_classes: int, device: torch.device):
                 break
 
     return model.to(device)
-
-
-def _freeze_backbone(model: torch.nn.Module, classifier_type: str, freeze: bool):
-    for param in model.parameters():
-        param.requires_grad = not freeze
-
-    if classifier_type == "fc":
-        for param in model.fc.parameters():
-            param.requires_grad = True
-    else:
-        for param in model.classifier.parameters():
-            param.requires_grad = True
-
-
-def _build_optimizer(config: dict, model: torch.nn.Module):
-    optimizer_name = config.get("optimizer_name", "AdamW")
-    learning_rate = config.get("learning_rate", 1e-4)
-    weight_decay = config.get("weight_decay", 1e-4)
-    trainable_params = [p for p in model.parameters() if p.requires_grad]
-
-    if not trainable_params:
-        raise ValueError("Nenhum parâmetro treinável encontrado para o otimizador.")
-
-    if optimizer_name != "AdamW":
-        raise ValueError(f"Otimizador não suportado: '{optimizer_name}'.")
-
-    return optim.AdamW(trainable_params, lr=learning_rate, weight_decay=weight_decay)
-
-
-def _build_scheduler(config: dict, optimizer):
-    return optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer,
-        mode="min",
-        factor=config.get("scheduler_factor", 0.5),
-        patience=config.get("scheduler_patience", 2),
-        min_lr=config.get("scheduler_min_lr", 1e-6),
-    )
 
 
 class TransformSubset(torch.utils.data.Dataset):
@@ -305,27 +262,6 @@ class TrainingManager:
         )
         self._thread.start()
 
-    def run_blocking(self, config: dict, progress_callback: Callable):
-        """Executa um treinamento no processo atual, sem thread auxiliar.
-
-        Útil para scripts CLI/pipelines onde os jobs devem rodar em sequência.
-        """
-        with self._lock:
-            if self.is_training:
-                raise RuntimeError("Já existe um treinamento em andamento.")
-
-            self._cancel_event.clear()
-            self._stop_early_event.clear()
-            self.is_paused = False
-            self.is_training = True
-            self.last_result = None
-
-        try:
-            self._train_loop(config, progress_callback)
-        finally:
-            with self._lock:
-                self.is_training = False
-
     def cancel(self):
         """Sinaliza cancelamento do treinamento (Descarta)."""
         self.is_paused = False
@@ -370,22 +306,15 @@ class TrainingManager:
         data_path = config["data_path"]
         batch_size = config.get("batch_size", 16)
         num_epochs = config.get("num_epochs", 20)
+        learning_rate = config.get("learning_rate", 1e-4)
         patience = config.get("patience", 5)
         train_split = config.get("train_split", 0.8)
         val_split = config.get("val_split", 0.1)
-        seed = int(config.get("seed", 42))
-        accumulation_steps = max(1, int(config.get("accumulation_steps", 1)))
-        freeze_backbone_epochs = max(0, int(config.get("freeze_backbone_epochs", 0)))
-        fine_tune_learning_rate = config.get(
-            "fine_tune_learning_rate",
-            config.get("learning_rate", 1e-4),
-        )
 
         if model_name not in TRAINING_MODEL_CONFIGS:
             raise ValueError(f"Modelo '{model_name}' não suportado.")
 
         cfg = TRAINING_MODEL_CONFIGS[model_name]
-        _set_seed(seed)
 
         # ── Device & runtime ──
         device, num_workers, pin_memory, persistent_workers, prefetch_factor = (
@@ -419,9 +348,8 @@ class TrainingManager:
                 f"Dataset muito pequeno ({total} imagens) para os splits configurados."
             )
 
-        split_generator = torch.Generator().manual_seed(seed)
         train_ds_raw, val_ds_raw, test_ds_raw = random_split(
-            dataset, [train_size, val_size, test_size], generator=split_generator
+            dataset, [train_size, val_size, test_size]
         )
 
         train_transforms = _build_train_transforms(cfg["input_size"])
@@ -469,11 +397,8 @@ class TrainingManager:
 
         # ── Model ──
         model = _build_model(model_name, num_classes, device)
-        if freeze_backbone_epochs > 0:
-            _freeze_backbone(model, cfg["classifier_type"], freeze=True)
         criterion = nn.CrossEntropyLoss(weight=class_weights)
-        optimizer = _build_optimizer(config, model)
-        scheduler = _build_scheduler(config, optimizer)
+        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
         use_amp = device.type == "cuda"
         scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
@@ -483,9 +408,6 @@ class TrainingManager:
         epochs_no_improve = 0
         total_batches = len(train_loader)
         start_time = time.time()
-        epoch_history = []
-        current_phase = "head" if freeze_backbone_epochs > 0 else "full"
-        phase_switched = False
 
         # Caminho para salvar pesos com timestamp
         os.makedirs(MODELS_SAVE_DIR, exist_ok=True)
@@ -516,23 +438,8 @@ class TrainingManager:
                 callback({"type": "status", "message": f"Treino finalizado antecipadamente. Salvando da época {epoch}..."})
                 break
 
-            if freeze_backbone_epochs > 0 and epoch == freeze_backbone_epochs and not phase_switched:
-                callback({
-                    "type": "status",
-                    "message": "Mudando para fase 2: destravando backbone para fine-tuning completo.",
-                })
-                _freeze_backbone(model, cfg["classifier_type"], freeze=False)
-                fine_tune_config = dict(config)
-                fine_tune_config["learning_rate"] = fine_tune_learning_rate
-                optimizer = _build_optimizer(fine_tune_config, model)
-                scheduler = _build_scheduler(config, optimizer)
-                current_phase = "full"
-                phase_switched = True
-                epochs_no_improve = 0
-
             model.train()
             running_loss = 0.0
-            optimizer.zero_grad(set_to_none=True)
 
             for batch_idx, (data, targets) in enumerate(train_loader):
                 while self.is_paused:
@@ -555,21 +462,14 @@ class TrainingManager:
                 data = data.to(device, non_blocking=pin_memory)
                 targets = targets.to(device, non_blocking=pin_memory)
 
+                optimizer.zero_grad()
                 with torch.autocast(device_type=device.type, enabled=use_amp):
                     outputs = model(data)
                     loss = criterion(outputs, targets)
-                    loss_for_backward = loss / accumulation_steps
 
-                scaler.scale(loss_for_backward).backward()
-
-                should_step = (
-                    (batch_idx + 1) % accumulation_steps == 0
-                    or batch_idx == total_batches - 1
-                )
-                if should_step:
-                    scaler.step(optimizer)
-                    scaler.update()
-                    optimizer.zero_grad(set_to_none=True)
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
                 running_loss += loss.item()
 
                 # Progresso por batch (a cada 5 batches para não sobrecarregar)
@@ -602,17 +502,6 @@ class TrainingManager:
 
             epoch_val_loss = val_loss / len(val_loader)
             elapsed = time.time() - start_time
-            scheduler.step(epoch_val_loss)
-            current_lr = float(optimizer.param_groups[0]["lr"])
-
-            epoch_history.append({
-                "epoch": epoch + 1,
-                "phase": current_phase,
-                "train_loss": round(epoch_train_loss, 6),
-                "val_loss": round(epoch_val_loss, 6),
-                "learning_rate": current_lr,
-                "elapsed_seconds": round(elapsed, 1),
-            })
 
             callback({
                 "type": "epoch_complete",
@@ -621,8 +510,6 @@ class TrainingManager:
                 "train_loss": round(epoch_train_loss, 6),
                 "val_loss": round(epoch_val_loss, 6),
                 "elapsed_seconds": round(elapsed, 1),
-                "learning_rate": current_lr,
-                "phase": current_phase,
             })
 
             # ── Early stopping ──
@@ -647,10 +534,6 @@ class TrainingManager:
 
         # ── Avaliação no test set ──
         callback({"type": "status", "message": "Avaliando modelo no conjunto de teste..."})
-
-        # Import tardio: evita que subprocessos do DataLoader no Windows
-        # carreguem sklearn/pandas desnecessariamente.
-        from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc
 
         checkpoint = torch.load(save_path, map_location=device, weights_only=False)
         if "state_dict" in checkpoint:
@@ -742,21 +625,6 @@ class TrainingManager:
             "confusion_matrix": cm.tolist(),
             "roc_curves": roc_curves,
             "common_fpr": common_fpr.tolist(),
-            "epoch_history": epoch_history,
-            "runtime": {
-                "device": device.type,
-                "num_workers": num_workers,
-                "pin_memory": pin_memory,
-                "mixed_precision": use_amp,
-                "optimizer": config.get("optimizer_name", "AdamW"),
-                "scheduler": "ReduceLROnPlateau",
-                "seed": seed,
-                "accumulation_steps": accumulation_steps,
-                "effective_batch_size": batch_size * accumulation_steps,
-                "freeze_backbone_epochs": freeze_backbone_epochs,
-                "fine_tune_learning_rate": fine_tune_learning_rate,
-                "input_size": cfg["input_size"],
-            },
         }
 
         history_path = os.path.join(MODELS_SAVE_DIR, "training_history.json")

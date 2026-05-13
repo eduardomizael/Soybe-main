@@ -16,9 +16,8 @@ export async function handleClassify(model: string, weight_filename: string | nu
     files.forEach((f) => formData.append("files", f));
 
     // Chama o endpoint de inferência do backend
-    // Implementando VITE_API_URL
-    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8001";
-    const response = await fetch("http://localhost:8001/inferencia", {
+    const apiUrl = (import.meta.env.VITE_API_URL || "http://localhost:8001").replace(/\/$/, "");
+    const response = await fetch(`${apiUrl}/inferencia`, {
         method: "POST",
         body: formData,
         signal,

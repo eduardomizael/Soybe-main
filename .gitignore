@@ -1,4 +1,4 @@
-# 🐍 Python
+# ─── Python ───────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
@@ -7,7 +7,6 @@ __pycache__/
 build/
 develop-eggs/
 dist/
-downloads/
 eggs/
 .eggs/
 lib/
@@ -23,68 +22,51 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-
-# 📦 Ambientes Virtuais
+# ─── Ambientes Virtuais ──────────────────────────────
 env/
 venv/
 ENV/
+.venv/
 env.bak/
 venv.bak/
 
-# 🔧 IDE - VS Code
+# ─── IDE ──────────────────────────────────────────────
 .vscode/
 *.code-workspace
 .history/
-launch.json
-
-# 🔧 IDE - PyCharm
 .idea/
 *.iml
 *.iws
 *.ipr
 out/
-
-# 🔧 IDE - Geral
 .DS_Store
-.AppleDouble
-.LSOverride
 *.swp
 *.swo
 *~
-.sublime-project
-.sublime-workspace
 
-# 📊 Jupyter Notebook
-.ipynb_checkpoints
-*.ipynb
-.jupyter/
-
-# 🤖 MLflow
-mlruns/
-.mlflow/
-
-# 📁 Dados e Modelos (arquivos grandes)
+# ─── Dados e Modelos (arquivos grandes) ──────────────
 data/
 models/*.pth
 models/*.pt
 models/*.onnx
 models/*.json
+models/*.txt
 *.h5
 *.pkl
 *.pickle
 *.joblib
 *.gz
 
-# 📸 Imagens de teste/processamento
+# ─── Imagens de teste/processamento ──────────────────
 *.jpg
 *.jpeg
 *.png
 *.bmp
 *.tiff
 *.gif
-!docs/imgs/**/*.png
+*.pdf
 
-# 🌐 Node/React
+# ─── Node/React (frontend) ──────────────────────────
 frontend/node_modules/
 frontend/.pnpm-store/
 frontend/dist/
@@ -96,22 +78,46 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+node_modules/
 
-# 📦 npm/pnpm lock (opcional - descomente se preferir versioná-los)
-# frontend/package-lock.json
-# frontend/pnpm-lock.yaml
-
-# 🔐 Variáveis de Ambiente
+# ─── Variáveis de Ambiente ───────────────────────────
 .env
 .env.local
 .env.*.local
 .env.prod
 config/.env
 
-# 🖥️ Dependências do Sistema
-node_modules/
-*.nox
-.tox/
+# ─── Build e distribuição ────────────────────────────
+dist/
+build/
+*.whl
+
+# ─── Logs ─────────────────────────────────────────────
+*.log
+logs/
+log/
+
+# ─── Banco de dados ──────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ─── Arquivos temporários ────────────────────────────
+tmp/
+temp/
+*.tmp
+*.bak
+
+# ─── Checkpoint/Treinamento ──────────────────────────
+checkpoints/
+snapshots/
+runs/
+events.out*
+
+# ─── Testes ───────────────────────────────────────────
+test_results/
+htmlcov/
+.pytest_cache/
 .coverage
 .coverage.*
 .cache
@@ -121,72 +127,16 @@ coverage.xml
 *.py,cover
 .hypothesis/
 
-# 🏗️ Build e distribuição
-dist/
-build/
-*.whl
-*.egg-info/
-
-# 🧹 OS
-Thumbs.db
-.DS_Store
-desktop.ini
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-
-# 📝 Logs
-*.log
-logs/
-log/
-
-# 🔌 Arquivos de banco de dados
-*.db
-*.sqlite
-*.sqlite3
-database.db
-
-# 🔗 Arquivos temporários
-tmp/
-temp/
-*.tmp
-*.bak
-*.swp
-
-# 🎯 Configurações locais
-local_config.py
-settings_local.py
-
-# 📊 Checkpoint/Salvamentos do treinamento
-checkpoints/
-snapshots/
-runs/
-events.out*
-
-# 🚀 Saída de teste
-test_results/
-htmlcov/
-.pytest_cache/
-
-# 🐳 Docker (se usar)
+# ─── Docker ───────────────────────────────────────────
 .dockerignore
 docker-compose.override.yml
 
-# 🔒 Secretos
+# ─── Segredos ─────────────────────────────────────────
 secrets/
 client_secrets.json
 credentials.json
 
-# ✅ Exceções (não ignorar esses)
+# ─── Exceções (não ignorar) ──────────────────────────
 !models/.gitkeep
 !data/.gitkeep
-!logs/.gitkeep
-
-# Ambiente Virtual
-env/
-venv/
-ENV/
-.venv
-
-data/
-Dataset_grider/
+!docs/imgs/**/*.png
