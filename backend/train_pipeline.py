@@ -23,148 +23,118 @@ from backend.services.training_service import (
 
 
 DATA_ROOT = Path(WORKSPACE_ROOT) / "data"
+DATASET_NAME = "sem_fundo"
 
-# Edite esta lista para montar sua sequência de treinamentos.
-PIPELINE: list[dict[str, Any]] = [
-    {
-        "model_name": "MobileNetV3",
-        "data_path": str(DATA_ROOT / "sem_fundo"),
+COMMON_CONFIG: dict[str, Any] = {
+    "data_path": str(DATA_ROOT / DATASET_NAME),
+    "num_epochs": 20,
+    "train_split": 0.8,
+    "val_split": 0.1,
+    "seed": 42,
+    "optimizer_name": "AdamW",
+    "weight_decay": 1e-4,
+    "scheduler_factor": 0.5,
+    "scheduler_patience": 2,
+    "scheduler_min_lr": 1e-6,
+}
+
+MODEL_CONFIGS: dict[str, dict[str, Any]] = {
+    "MobileNetV3": {
         "batch_size": 12,
-        "num_epochs": 20,
         "learning_rate": 1.5e-4,
         "fine_tune_learning_rate": 1e-4,
-        "early_stopping": False,
-        "split_strategy": "stratified",
-        "checkpoint_metric": "val_macro_f1",
-        "sampler_strategy": "weighted",
-        "patience": 5,
-        "train_split": 0.8,
-        "val_split": 0.1,
-        "seed": 42,
-        "optimizer_name": "AdamW",
-        "weight_decay": 1e-4,
-        "scheduler_factor": 0.5,
-        "scheduler_patience": 2,
-        "scheduler_min_lr": 1e-6,
         "accumulation_steps": 1,
         "freeze_backbone_epochs": 2,
     },
-    {
-        "model_name": "EfficientNetB0",
-        "data_path": str(DATA_ROOT / "sem_fundo"),
+    "EfficientNetB0": {
         "batch_size": 8,
-        "num_epochs": 20,
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 8e-5,
-        "early_stopping": False,
-        "split_strategy": "stratified",
-        "checkpoint_metric": "val_macro_f1",
-        "sampler_strategy": "weighted",
-        "patience": 5,
-        "train_split": 0.8,
-        "val_split": 0.1,
-        "seed": 42,
-        "optimizer_name": "AdamW",
-        "weight_decay": 1e-4,
-        "scheduler_factor": 0.5,
-        "scheduler_patience": 2,
-        "scheduler_min_lr": 1e-6,
         "accumulation_steps": 1,
         "freeze_backbone_epochs": 2,
     },
-    {
-        "model_name": "EfficientNetB2",
-        "data_path": str(DATA_ROOT / "sem_fundo"),
+    "EfficientNetB2": {
         "batch_size": 6,
-        "num_epochs": 20,
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 8e-5,
-        "early_stopping": False,
-        "split_strategy": "stratified",
-        "checkpoint_metric": "val_macro_f1",
-        "sampler_strategy": "weighted",
-        "patience": 5,
-        "train_split": 0.8,
-        "val_split": 0.1,
-        "seed": 42,
-        "optimizer_name": "AdamW",
-        "weight_decay": 1e-4,
-        "scheduler_factor": 0.5,
-        "scheduler_patience": 2,
-        "scheduler_min_lr": 1e-6,
         "accumulation_steps": 1,
         "freeze_backbone_epochs": 2,
     },
-    {
-        "model_name": "EfficientNetB3",
-        "data_path": str(DATA_ROOT / "sem_fundo"),
+    "EfficientNetB3": {
         "batch_size": 4,
-        "num_epochs": 20,
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 7e-5,
-        "early_stopping": False,
-        "split_strategy": "stratified",
-        "checkpoint_metric": "val_macro_f1",
-        "sampler_strategy": "weighted",
-        "patience": 5,
-        "train_split": 0.8,
-        "val_split": 0.1,
-        "seed": 42,
-        "optimizer_name": "AdamW",
-        "weight_decay": 1e-4,
-        "scheduler_factor": 0.5,
-        "scheduler_patience": 2,
-        "scheduler_min_lr": 1e-6,
         "accumulation_steps": 2,
         "freeze_backbone_epochs": 2,
     },
-    {
-        "model_name": "ResNet50",
-        "data_path": str(DATA_ROOT / "sem_fundo"),
+    # Disponivel para reativar, mas fora da comparacao padrao por custo alto
+    # para ganho pequeno nos relatorios atuais.
+    "ResNet50": {
         "batch_size": 4,
-        "num_epochs": 20,
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 8e-5,
-        "early_stopping": False,
-        "split_strategy": "stratified",
-        "checkpoint_metric": "val_macro_f1",
-        "sampler_strategy": "weighted",
-        "patience": 5,
-        "train_split": 0.8,
-        "val_split": 0.1,
-        "seed": 42,
-        "optimizer_name": "AdamW",
-        "weight_decay": 1e-4,
-        "scheduler_factor": 0.5,
-        "scheduler_patience": 2,
-        "scheduler_min_lr": 1e-6,
         "accumulation_steps": 1,
         "freeze_backbone_epochs": 2,
     },
-    {
-        "model_name": "EfficientNetB7",
-        "data_path": str(DATA_ROOT / "sem_fundo"),
+    # Fora da comparacao padrao: relatorios anteriores indicaram baixo
+    # desempenho e tempo de treinamento muito alto.
+    "EfficientNetB7": {
         "batch_size": 1,
         "num_epochs": 16,
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 5e-5,
+        "accumulation_steps": 8,
+        "freeze_backbone_epochs": 3,
+    },
+}
+
+EXPERIMENTS: dict[str, dict[str, Any]] = {
+    "baseline": {
+        "early_stopping": True,
+        "split_strategy": "random",
+        "checkpoint_metric": "val_loss",
+        "sampler_strategy": "shuffle",
+        "patience": 5,
+    },
+    "experimental": {
         "early_stopping": False,
         "split_strategy": "stratified",
         "checkpoint_metric": "val_macro_f1",
         "sampler_strategy": "weighted",
-        "patience": 4,
-        "train_split": 0.8,
-        "val_split": 0.1,
-        "seed": 42,
-        "optimizer_name": "AdamW",
-        "weight_decay": 1e-4,
-        "scheduler_factor": 0.5,
-        "scheduler_patience": 2,
-        "scheduler_min_lr": 1e-6,
-        "accumulation_steps": 8,
-        "freeze_backbone_epochs": 3,
+        "patience": 5,
     },
+}
+
+# Relatorios atuais justificam comparar estes modelos:
+# - MobileNetV3: melhor macro F1 e menor tempo entre os melhores.
+# - EfficientNetB0: rapido e competitivo.
+# - EfficientNetB2: melhor acuracia entre EfficientNets testados.
+# - EfficientNetB3: novo ponto intermediario entre B2 e B7.
+CANDIDATE_MODELS = [
+    "MobileNetV3",
+    "EfficientNetB0",
+    "EfficientNetB2",
+    "EfficientNetB3",
 ]
+
+
+def _build_pipeline() -> list[dict[str, Any]]:
+    jobs: list[dict[str, Any]] = []
+    for model_name in CANDIDATE_MODELS:
+        model_config = MODEL_CONFIGS[model_name]
+        for experiment_name, experiment_config in EXPERIMENTS.items():
+            job = {
+                **COMMON_CONFIG,
+                **model_config,
+                **experiment_config,
+                "model_name": model_name,
+                "experiment_name": experiment_name,
+            }
+            jobs.append(job)
+    return jobs
+
+
+PIPELINE: list[dict[str, Any]] = _build_pipeline()
 
 
 def _validate_job(job: dict[str, Any]) -> dict[str, Any]:
@@ -217,6 +187,7 @@ def _print_job_header(index: int, total: int, job: dict[str, Any]) -> None:
     print("=" * 72)
     print(
         f"[{index}/{total}] {job['model_name']} | "
+        f"experiment={job.get('experiment_name', 'default')} | "
         f"dataset={Path(job['data_path']).name} | "
         f"epochs={job['num_epochs']} | batch={job['batch_size']}"
     )
@@ -245,6 +216,7 @@ def _build_progress_callback(job: dict[str, Any]):
             progress = (batch / total_batches) * 100 if total_batches else 100.0
             line = (
                 f"\r[batch] {job['model_name']} | "
+                f"{job.get('experiment_name', 'default')} | "
                 f"epoch {epoch}/{total_epochs} | "
                 f"batch {batch}/{total_batches} | "
                 f"{progress:5.1f}% | loss={loss:.4f}"
@@ -301,6 +273,7 @@ def _write_training_report(job: dict[str, Any], result: dict[str, Any]) -> Path:
     lines.append("=" * 72)
     lines.append(f"Gerado em: {datetime.now().isoformat(timespec='seconds')}")
     lines.append(f"Modelo: {job['model_name']}")
+    lines.append(f"Experimento: {job.get('experiment_name', 'default')}")
     lines.append(f"Dataset: {job['data_path']}")
     lines.append(f"Arquivo de pesos: {result['model_path']}")
     lines.append("")
@@ -436,6 +409,7 @@ def _write_error_report(job: dict[str, Any], error_message: str) -> Path:
     lines.append("=" * 72)
     lines.append(f"Gerado em: {datetime.now().isoformat(timespec='seconds')}")
     lines.append(f"Modelo: {job['model_name']}")
+    lines.append(f"Experimento: {job.get('experiment_name', 'default')}")
     lines.append(f"Dataset: {job['data_path']}")
     lines.append("")
     lines.append("CONFIGURACAO")
@@ -483,6 +457,7 @@ def _write_pipeline_summary(entries: list[dict[str, Any]]) -> Path:
         lines.append("-" * 72)
         lines.append(
             f"{entry['model_name']} | status={entry['status']} | "
+            f"experiment={entry.get('experiment_name', 'default')} | "
             f"dataset={Path(entry['data_path']).name}"
         )
         if entry["status"] == "success":
@@ -530,6 +505,7 @@ def main() -> int:
                 print(f"[report] {report_path}")
                 summary_entries.append({
                     "model_name": job["model_name"],
+                    "experiment_name": job.get("experiment_name", "default"),
                     "data_path": job["data_path"],
                     "status": "success",
                     "accuracy": result.get("accuracy", 0.0),
@@ -558,6 +534,7 @@ def main() -> int:
             print(f"[report] {report_path}")
             summary_entries.append({
                 "model_name": job["model_name"],
+                "experiment_name": job.get("experiment_name", "default"),
                 "data_path": job["data_path"],
                 "status": "error",
                 "error": str(exc),

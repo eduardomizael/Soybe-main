@@ -302,6 +302,14 @@ def _is_checkpoint_improved(metric_name: str, current: float, best: float) -> bo
     return current > best
 
 
+def _safe_name(value: str) -> str:
+    safe = "".join(
+        char.lower() if char.isalnum() else "_"
+        for char in value.strip()
+    )
+    return "_".join(part for part in safe.split("_") if part)
+
+
 def _build_train_transforms(input_size: int):
     """Transforms agressivos exclusivos para treinamento (lida com desbalanceamento)."""
     return T.Compose([
@@ -476,6 +484,7 @@ class TrainingManager:
 
     def _train_loop(self, config: dict, callback: Callable):
         model_name = config["model_name"]
+        experiment_name = config.get("experiment_name", "default")
         data_path = config["data_path"]
         batch_size = config.get("batch_size", 16)
         num_epochs = config.get("num_epochs", 20)
@@ -649,8 +658,12 @@ class TrainingManager:
         # Caminho para salvar pesos com timestamp
         os.makedirs(MODELS_SAVE_DIR, exist_ok=True)
         timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        experiment_slug = _safe_name(experiment_name)
+        model_file_prefix = f"soybean_model_{model_name.lower()}"
+        if experiment_slug and experiment_slug != "default":
+            model_file_prefix = f"{model_file_prefix}_{experiment_slug}"
         save_path = os.path.join(
-            MODELS_SAVE_DIR, f"soybean_model_{model_name.lower()}_{timestamp_str}.pth"
+            MODELS_SAVE_DIR, f"{model_file_prefix}_{timestamp_str}.pth"
         )
 
         has_saved_checkpoint = False
@@ -938,6 +951,7 @@ class TrainingManager:
 
         result = {
             "type": "training_complete",
+            "experiment_name": experiment_name,
             "total_time": round(total_time, 1),
             "best_val_loss": round(best_val_loss, 6),
             "best_checkpoint_metric": checkpoint_metric,
@@ -991,6 +1005,7 @@ class TrainingManager:
         history_entry = {
             "timestamp": datetime.now().isoformat(),
             "model_name": model_name,
+            "experiment_name": experiment_name,
             "dataset_name": os.path.basename(os.path.normpath(data_path)),
             "config": config,
             "result": result

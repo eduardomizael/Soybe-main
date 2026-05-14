@@ -241,6 +241,8 @@ O pipeline preserva recursos importantes do servico de treinamento:
 - metricas de eficiencia para comparar modelos;
 - relatorios individuais e resumo consolidado.
 
+A pipeline comparativa combina automaticamente os modelos candidatos com os experimentos `baseline` e `experimental`, permitindo medir se as melhorias de balanceamento realmente compensam em qualidade e custo.
+
 ## Validacao
 
 Comandos usados para validar a integracao:

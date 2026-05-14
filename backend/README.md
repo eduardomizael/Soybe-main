@@ -134,6 +134,20 @@ Com `checkpoint_metric: "val_macro_f1"`, o melhor checkpoint passa a ser escolhi
 
 Os resultados finais incluem o bloco `efficiency` com throughput de treino, throughput de teste, contagem de parametros e tamanho do checkpoint.
 
+A pipeline CLI gera automaticamente dois experimentos por modelo candidato:
+
+- `baseline`: `random` + `shuffle` + checkpoint por `val_loss` + early stopping.
+- `experimental`: `stratified` + `weighted` + checkpoint por `val_macro_f1` + treino ate o fim.
+
+Modelos candidatos padrao:
+
+- `MobileNetV3`
+- `EfficientNetB0`
+- `EfficientNetB2`
+- `EfficientNetB3`
+
+`ResNet50` e `EfficientNetB7` permanecem parametrizados no arquivo, mas ficam fora da comparacao padrao por custo/beneficio inferior nos relatorios atuais.
+
 Artefatos gerados em `models/`:
 
 - `.pth` do modelo;
