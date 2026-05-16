@@ -658,8 +658,11 @@ class TrainingManager:
         # Caminho para salvar pesos com timestamp
         os.makedirs(MODELS_SAVE_DIR, exist_ok=True)
         timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        dataset_slug = _safe_name(
+            config.get("dataset_name") or os.path.basename(os.path.normpath(data_path))
+        )
         experiment_slug = _safe_name(experiment_name)
-        model_file_prefix = f"soybean_model_{model_name.lower()}"
+        model_file_prefix = f"soybean_model_{model_name.lower()}_{dataset_slug}"
         if experiment_slug and experiment_slug != "default":
             model_file_prefix = f"{model_file_prefix}_{experiment_slug}"
         save_path = os.path.join(
@@ -952,6 +955,8 @@ class TrainingManager:
         result = {
             "type": "training_complete",
             "experiment_name": experiment_name,
+            "dataset_name": config.get("dataset_name")
+            or os.path.basename(os.path.normpath(data_path)),
             "total_time": round(total_time, 1),
             "best_val_loss": round(best_val_loss, 6),
             "best_checkpoint_metric": checkpoint_metric,
@@ -969,6 +974,8 @@ class TrainingManager:
             "epoch_history": epoch_history,
             "runtime": {
                 "device": device.type,
+                "dataset_name": config.get("dataset_name")
+                or os.path.basename(os.path.normpath(data_path)),
                 "num_workers": num_workers,
                 "pin_memory": pin_memory,
                 "mixed_precision": use_amp,

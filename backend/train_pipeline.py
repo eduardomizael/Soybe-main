@@ -23,10 +23,12 @@ from backend.services.training_service import (
 
 
 DATA_ROOT = Path(WORKSPACE_ROOT) / "data"
-DATASET_NAME = "sem_fundo"
+DATASET_NAMES = [
+    "sem_fundo",
+    "com_fundo",
+]
 
 COMMON_CONFIG: dict[str, Any] = {
-    "data_path": str(DATA_ROOT / DATASET_NAME),
     "num_epochs": 20,
     "train_split": 0.8,
     "val_split": 0.1,
@@ -40,40 +42,40 @@ COMMON_CONFIG: dict[str, Any] = {
 
 MODEL_CONFIGS: dict[str, dict[str, Any]] = {
     "MobileNetV3": {
-        "batch_size": 12,
+        "batch_size": 8,
         "learning_rate": 1.5e-4,
         "fine_tune_learning_rate": 1e-4,
         "accumulation_steps": 1,
         "freeze_backbone_epochs": 2,
     },
     "EfficientNetB0": {
-        "batch_size": 8,
-        "learning_rate": 1e-4,
-        "fine_tune_learning_rate": 8e-5,
-        "accumulation_steps": 1,
-        "freeze_backbone_epochs": 2,
-    },
-    "EfficientNetB2": {
         "batch_size": 6,
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 8e-5,
         "accumulation_steps": 1,
         "freeze_backbone_epochs": 2,
     },
-    "EfficientNetB3": {
+    "EfficientNetB2": {
         "batch_size": 4,
         "learning_rate": 1e-4,
+        "fine_tune_learning_rate": 8e-5,
+        "accumulation_steps": 1,
+        "freeze_backbone_epochs": 2,
+    },
+    "EfficientNetB3": {
+        "batch_size": 2,
+        "learning_rate": 1e-4,
         "fine_tune_learning_rate": 7e-5,
-        "accumulation_steps": 2,
+        "accumulation_steps": 4,
         "freeze_backbone_epochs": 2,
     },
     # Disponivel para reativar, mas fora da comparacao padrao por custo alto
     # para ganho pequeno nos relatorios atuais.
     "ResNet50": {
-        "batch_size": 4,
+        "batch_size": 2,
         "learning_rate": 1e-4,
         "fine_tune_learning_rate": 8e-5,
-        "accumulation_steps": 1,
+        "accumulation_steps": 2,
         "freeze_backbone_epochs": 2,
     },
     # Fora da comparacao padrao: relatorios anteriores indicaram baixo
@@ -120,21 +122,32 @@ CANDIDATE_MODELS = [
 
 def _build_pipeline() -> list[dict[str, Any]]:
     jobs: list[dict[str, Any]] = []
-    for model_name in CANDIDATE_MODELS:
-        model_config = MODEL_CONFIGS[model_name]
-        for experiment_name, experiment_config in EXPERIMENTS.items():
-            job = {
-                **COMMON_CONFIG,
-                **model_config,
-                **experiment_config,
-                "model_name": model_name,
-                "experiment_name": experiment_name,
-            }
-            jobs.append(job)
+    for dataset_name in DATASET_NAMES:
+        for model_name in CANDIDATE_MODELS:
+            model_config = MODEL_CONFIGS[model_name]
+            for experiment_name, experiment_config in EXPERIMENTS.items():
+                job = {
+                    **COMMON_CONFIG,
+                    **model_config,
+                    **experiment_config,
+                    "model_name": model_name,
+                    "experiment_name": experiment_name,
+                    "dataset_name": dataset_name,
+                    "data_path": str(DATA_ROOT / dataset_name),
+                }
+                jobs.append(job)
     return jobs
 
 
 PIPELINE: list[dict[str, Any]] = _build_pipeline()
+
+
+def _safe_name(value: str) -> str:
+    safe = "".join(
+        char.lower() if char.isalnum() else "_"
+        for char in value.strip()
+    )
+    return "_".join(part for part in safe.split("_") if part)
 
 
 def _validate_job(job: dict[str, Any]) -> dict[str, Any]:
@@ -179,6 +192,7 @@ def _validate_job(job: dict[str, Any]) -> dict[str, Any]:
 
     normalized = dict(job)
     normalized["data_path"] = str(data_path)
+    normalized["dataset_name"] = normalized.get("dataset_name") or data_path.name
     return normalized
 
 
@@ -188,7 +202,7 @@ def _print_job_header(index: int, total: int, job: dict[str, Any]) -> None:
     print(
         f"[{index}/{total}] {job['model_name']} | "
         f"experiment={job.get('experiment_name', 'default')} | "
-        f"dataset={Path(job['data_path']).name} | "
+        f"dataset={job.get('dataset_name', Path(job['data_path']).name)} | "
         f"epochs={job['num_epochs']} | batch={job['batch_size']}"
     )
     print("=" * 72)
@@ -274,6 +288,7 @@ def _write_training_report(job: dict[str, Any], result: dict[str, Any]) -> Path:
     lines.append(f"Gerado em: {datetime.now().isoformat(timespec='seconds')}")
     lines.append(f"Modelo: {job['model_name']}")
     lines.append(f"Experimento: {job.get('experiment_name', 'default')}")
+    lines.append(f"Dataset nome: {job.get('dataset_name', Path(job['data_path']).name)}")
     lines.append(f"Dataset: {job['data_path']}")
     lines.append(f"Arquivo de pesos: {result['model_path']}")
     lines.append("")
@@ -316,6 +331,7 @@ def _write_training_report(job: dict[str, Any], result: dict[str, Any]) -> Path:
         lines.append("")
         lines.append("RUNTIME")
         lines.append("-" * 72)
+        lines.append(f"dataset_name: {runtime.get('dataset_name', job.get('dataset_name', 'unknown'))}")
         lines.append(f"device: {runtime.get('device', 'unknown')}")
         lines.append(f"num_workers: {runtime.get('num_workers', 'unknown')}")
         lines.append(f"pin_memory: {runtime.get('pin_memory', 'unknown')}")
@@ -397,7 +413,13 @@ def _write_training_report(job: dict[str, Any], result: dict[str, Any]) -> Path:
 def _build_error_report_path(job: dict[str, Any]) -> Path:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     model_name = job["model_name"].lower()
-    return Path(WORKSPACE_ROOT) / "models" / f"soybean_model_{model_name}_{timestamp}_error.txt"
+    dataset_name = _safe_name(job.get("dataset_name", Path(job["data_path"]).name))
+    experiment_name = _safe_name(job.get("experiment_name", "default"))
+    return (
+        Path(WORKSPACE_ROOT)
+        / "models"
+        / f"soybean_model_{model_name}_{dataset_name}_{experiment_name}_{timestamp}_error.txt"
+    )
 
 
 def _write_error_report(job: dict[str, Any], error_message: str) -> Path:
@@ -410,6 +432,7 @@ def _write_error_report(job: dict[str, Any], error_message: str) -> Path:
     lines.append(f"Gerado em: {datetime.now().isoformat(timespec='seconds')}")
     lines.append(f"Modelo: {job['model_name']}")
     lines.append(f"Experimento: {job.get('experiment_name', 'default')}")
+    lines.append(f"Dataset nome: {job.get('dataset_name', Path(job['data_path']).name)}")
     lines.append(f"Dataset: {job['data_path']}")
     lines.append("")
     lines.append("CONFIGURACAO")
@@ -458,7 +481,7 @@ def _write_pipeline_summary(entries: list[dict[str, Any]]) -> Path:
         lines.append(
             f"{entry['model_name']} | status={entry['status']} | "
             f"experiment={entry.get('experiment_name', 'default')} | "
-            f"dataset={Path(entry['data_path']).name}"
+            f"dataset={entry.get('dataset_name', Path(entry['data_path']).name)}"
         )
         if entry["status"] == "success":
             lines.append(
@@ -506,6 +529,7 @@ def main() -> int:
                 summary_entries.append({
                     "model_name": job["model_name"],
                     "experiment_name": job.get("experiment_name", "default"),
+                    "dataset_name": job.get("dataset_name", Path(job["data_path"]).name),
                     "data_path": job["data_path"],
                     "status": "success",
                     "accuracy": result.get("accuracy", 0.0),
@@ -535,6 +559,7 @@ def main() -> int:
             summary_entries.append({
                 "model_name": job["model_name"],
                 "experiment_name": job.get("experiment_name", "default"),
+                "dataset_name": job.get("dataset_name", Path(job["data_path"]).name),
                 "data_path": job["data_path"],
                 "status": "error",
                 "error": str(exc),
