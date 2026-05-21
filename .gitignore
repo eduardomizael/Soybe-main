@@ -65,10 +65,8 @@ mlruns/
 
 # 📁 Dados e Modelos (arquivos grandes)
 data/
-models/*.pth
-models/*.pt
-models/*.onnx
-models/*.json
+models/
+
 *.h5
 *.pkl
 *.pickle
@@ -190,3 +188,6 @@ ENV/
 
 data/
 Dataset_grider/
+
+docs/
+scripts/
