@@ -1,0 +1,861 @@
+# Jobs explicitos para backend.train_pipeline.
+# Rode todos os jobs habilitados:
+#   python -m backend.train_pipeline
+#
+# Exemplos de filtros:
+#   python -m backend.train_pipeline --id mobilenetv3_sem_fundo_baseline
+#   python -m backend.train_pipeline --dataset sem_fundo --model MobileNetV3
+#   python -m backend.train_pipeline --experiment experimental
+#   python -m backend.train_pipeline --tag rtx3070-8gb
+
+[[jobs]]
+id = "mobilenetv3_sem_fundo_baseline"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "sem_fundo", "baseline", "mobilenet"]
+notes = "MobileNetV3 foi mantido como candidato principal por combinar bom macro F1 com menor custo de treinamento. Batch 32 aproveita melhor a RTX 3070 de 8 GB sem pressionar memoria."
+dataset_name = "sem_fundo"
+data_path = "data/sem_fundo"
+model_name = "MobileNetV3"
+experiment_name = "baseline"
+batch_size = 32
+num_epochs = 20
+learning_rate = 0.00015
+fine_tune_learning_rate = 0.0001
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+
+# ---------------------------------------------------------------------------
+# Rodada de refinamento R3
+#
+# Estes jobs testam as melhorias implementadas apos a R2:
+# - loss configuravel: cross_entropy ou focal
+# - pesos de classe configuraveis: sqrt_inverse, effective_number ou none
+# - label smoothing
+# - augmentation_profile conservador para preservar sinais de cor
+#
+# Todos ficam desabilitados por padrao. Para executar:
+#
+#   .\.venv\Scripts\python.exe -m backend.train_pipeline --include-disabled --tag refinamento-r3
+#
+# Para uma primeira passada mais barata:
+#
+#   .\.venv\Scripts\python.exe -m backend.train_pipeline --include-disabled --tag refinamento-r3 --tag mobilenet
+# ---------------------------------------------------------------------------
+
+[[jobs]]
+id = "mobilenetv3_com_fundo_r3_no_class_weights"
+enabled = false
+tags = ["rtx3070-8gb", "refinamento-r3", "com_fundo", "mobilenet", "no-sampler", "no-class-weights", "ablacao-loss", "eficiencia"]
+notes = "Ablacao direta do melhor resultado da R2. MobileNetV3 sem weighted sampler venceu a rodada anterior; este job remove tambem os pesos de classe da CrossEntropyLoss para medir se a ponderacao na loss ainda esta supercompensando classes raras. Mantem augmentation standard para isolar apenas o efeito de class_weight_strategy = none."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "MobileNetV3"
+experiment_name = "r3_no_class_weights"
+batch_size = 32
+num_epochs = 30
+learning_rate = 0.00012
+fine_tune_learning_rate = 0.00008
+early_stopping = true
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "shuffle"
+loss_name = "cross_entropy"
+class_weight_strategy = "none"
+label_smoothing = 0.0
+focal_gamma = 1.5
+augmentation_profile = "standard"
+patience = 7
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.00015
+scheduler_factor = 0.5
+scheduler_patience = 3
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "mobilenetv3_com_fundo_r3_label_smoothing_conservative"
+enabled = false
+tags = ["rtx3070-8gb", "refinamento-r3", "com_fundo", "mobilenet", "no-sampler", "label-smoothing", "conservative-color", "eficiencia"]
+notes = "Teste principal de refinamento barato. Mantem MobileNetV3 sem weighted sampler, mas adiciona label_smoothing = 0.05 e augmentation_profile = conservative_color. O objetivo e reduzir excesso de confianca e preservar sinais cromaticos importantes para ESVERDEADO e PURPURAS, sem abandonar totalmente os pesos suaves por classe."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "MobileNetV3"
+experiment_name = "r3_label_smoothing_conservative"
+batch_size = 32
+num_epochs = 30
+learning_rate = 0.00012
+fine_tune_learning_rate = 0.00008
+early_stopping = true
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "shuffle"
+loss_name = "cross_entropy"
+class_weight_strategy = "sqrt_inverse"
+label_smoothing = 0.05
+focal_gamma = 1.5
+augmentation_profile = "conservative_color"
+patience = 7
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.00015
+scheduler_factor = 0.5
+scheduler_patience = 3
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "mobilenetv3_com_fundo_r3_focal_conservative"
+enabled = false
+tags = ["rtx3070-8gb", "refinamento-r3", "com_fundo", "mobilenet", "no-sampler", "focal-loss", "conservative-color", "classes-dificeis"]
+notes = "Teste de Focal Loss no candidato eficiente. Usa focal_gamma = 1.5 para concentrar gradiente nos exemplos dificeis sem recorrer ao weighted sampler. Mantem class_weight_strategy = sqrt_inverse, que e mais suave que pesos inversos puros, e usa augmentation conservadora para nao apagar sinais de cor. Comparar principalmente INSETOS, ESVERDEADO, PURPURAS, CHOCHOS e a confusao NORMAIS->CHOCHOS."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "MobileNetV3"
+experiment_name = "r3_focal_conservative"
+batch_size = 32
+num_epochs = 30
+learning_rate = 0.00012
+fine_tune_learning_rate = 0.00008
+early_stopping = true
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "shuffle"
+loss_name = "focal"
+class_weight_strategy = "sqrt_inverse"
+label_smoothing = 0.0
+focal_gamma = 1.5
+augmentation_profile = "conservative_color"
+patience = 7
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.00015
+scheduler_factor = 0.5
+scheduler_patience = 3
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb2_com_fundo_r3_no_class_weights"
+enabled = false
+tags = ["rtx3070-8gb", "refinamento-r3", "com_fundo", "efficientnet", "efficientnetb2", "no-sampler", "no-class-weights", "ablacao-loss"]
+notes = "Ablacao equivalente no EfficientNetB2. A R2 indicou que remover weighted sampler ajudou, mas B2 ainda perdeu para sua R1 experimental. Este job remove tambem os pesos de classe da loss para verificar se a combinacao de class weights com split estratificado esta deslocando demais a fronteira de classes majoritarias como NORMAIS, CHOCHOS e QUEBRADOS."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "EfficientNetB2"
+experiment_name = "r3_no_class_weights"
+batch_size = 12
+num_epochs = 30
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00006
+early_stopping = true
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "shuffle"
+loss_name = "cross_entropy"
+class_weight_strategy = "none"
+label_smoothing = 0.0
+focal_gamma = 1.5
+augmentation_profile = "standard"
+patience = 7
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.00015
+scheduler_factor = 0.5
+scheduler_patience = 3
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb2_com_fundo_r3_label_smoothing_conservative"
+enabled = false
+tags = ["rtx3070-8gb", "refinamento-r3", "com_fundo", "efficientnet", "efficientnetb2", "no-sampler", "label-smoothing", "conservative-color", "candidato-qualidade"]
+notes = "Teste de maior interesse para EfficientNetB2. Usa a base sem sampler da R2, adicionando label_smoothing = 0.05 e augmentation conservadora. A meta e recuperar PURPURAS e CHOCHOS, que pioraram em media na R2, sem perder os ganhos observados em INSETOS e ESVERDEADO."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "EfficientNetB2"
+experiment_name = "r3_label_smoothing_conservative"
+batch_size = 12
+num_epochs = 30
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00006
+early_stopping = true
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "shuffle"
+loss_name = "cross_entropy"
+class_weight_strategy = "sqrt_inverse"
+label_smoothing = 0.05
+focal_gamma = 1.5
+augmentation_profile = "conservative_color"
+patience = 7
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.00015
+scheduler_factor = 0.5
+scheduler_patience = 3
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb2_com_fundo_r3_focal_conservative"
+enabled = false
+tags = ["rtx3070-8gb", "refinamento-r3", "com_fundo", "efficientnet", "efficientnetb2", "no-sampler", "focal-loss", "conservative-color", "classes-dificeis"]
+notes = "Focal Loss no candidato de qualidade intermediaria. Deve mostrar se focar exemplos dificeis melhora classes raras e ambiguas sem o custo do B3. Se este job superar o B2 R2 no_sampler e se aproximar do B3 R1, ele vira o melhor candidato de qualidade/custo para nova rodada de seeds."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "EfficientNetB2"
+experiment_name = "r3_focal_conservative"
+batch_size = 12
+num_epochs = 30
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00006
+early_stopping = true
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "shuffle"
+loss_name = "focal"
+class_weight_strategy = "sqrt_inverse"
+label_smoothing = 0.0
+focal_gamma = 1.5
+augmentation_profile = "conservative_color"
+patience = 7
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.00015
+scheduler_factor = 0.5
+scheduler_patience = 3
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+
+# ---------------------------------------------------------------------------
+# Rodada de refinamento R2
+#
+# Estes jobs ficam desabilitados por padrao para evitar que `python -m
+# backend.train_pipeline` reexecute a comparacao principal inteira junto com uma
+# rodada longa. Para executar esta rodada:
+#
+#   .\.venv\Scripts\python.exe -m backend.train_pipeline --include-disabled --tag refinamento-r2
+#
+# Para rodar apenas um candidato:
+#
+#   .\.venv\Scripts\python.exe -m backend.train_pipeline --include-disabled --id efficientnetb2_com_fundo_refine_macro_f1_r2
+#
+# Observacao: o input_size e definido no codigo por arquitetura
+# (MobileNetV3=224, EfficientNetB2=260, EfficientNetB3=300). Nao ha override
+# de input_size no TOML hoje, entao estes jobs exploram apenas parametros que a
+# pipeline ja aplica de fato.
+# ---------------------------------------------------------------------------
+
+[[jobs]]
+id = "efficientnetb2_com_fundo_refine_macro_f1_r2"
+enabled = false
+tags = ["rtx3070-8gb", "refinamento-r2", "com_fundo", "candidato-principal", "efficientnet", "efficientnetb2", "macro-f1", "weighted", "stratified", "long-run"]
+notes = "Refinamento principal recomendado. EfficientNetB2 experimental foi o melhor equilibrio entre qualidade e custo: ficou muito perto do B3 em macro F1 e teve a maior accuracy geral. Mantem com_fundo porque este dataset venceu sem_fundo na media e nas classes ambiguas. Usa split estratificado, weighted sampler e checkpoint por val_macro_f1 para proteger classes minoritarias como INSETOS, ESVERDEADO e PURPURAS. Aumenta para 30 epocas com early stopping por macro F1 e patience 7, permitindo mais tempo de convergencia sem obrigar o treino a ir ate o fim. Reduz levemente fine_tune_learning_rate para 0.00006 para refinamento mais estavel depois da fase de cabeca."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "EfficientNetB2"
+experiment_name = "refine_macro_f1_r2"
+batch_size = 12
+num_epochs = 30
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00006
+early_stopping = true
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "weighted"
+patience = 7
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.00015
+scheduler_factor = 0.5
+scheduler_patience = 3
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb2_com_fundo_refine_no_sampler_r2"
+enabled = false
+tags = ["rtx3070-8gb", "refinamento-r2", "com_fundo", "ablacao", "efficientnet", "efficientnetb2", "macro-f1", "no-weighted-sampler", "stratified"]
+notes = "Ablacao do candidato principal. Mantem EfficientNetB2, com_fundo, split estratificado e checkpoint por val_macro_f1, mas troca weighted sampler por shuffle. A pipeline ainda usa pesos de classe na CrossEntropyLoss; este job separa o efeito do sampler ponderado do efeito dos pesos da loss. Se o macro F1 cair nas classes raras, o sampler deve ser mantido. Se subir ou estabilizar, o sampler pode estar gerando repeticao excessiva das classes pequenas e prejudicando calibracao."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "EfficientNetB2"
+experiment_name = "refine_no_sampler_r2"
+batch_size = 12
+num_epochs = 30
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00006
+early_stopping = true
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "shuffle"
+patience = 7
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.00015
+scheduler_factor = 0.5
+scheduler_patience = 3
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb3_com_fundo_refine_macro_f1_r2"
+enabled = false
+tags = ["rtx3070-8gb", "refinamento-r2", "com_fundo", "teto-performance", "efficientnet", "efficientnetb3", "macro-f1", "weighted", "stratified", "long-run"]
+notes = "Candidato de teto de performance. EfficientNetB3 experimental com_fundo obteve o melhor macro F1 geral, mas com custo alto de treino. Este job conserva a receita vencedora (com_fundo, stratified, weighted, checkpoint por val_macro_f1) e aumenta para 30 epocas com early stopping, para buscar ganho fino sem desperdiçar execucao se a validacao parar de melhorar. Usa fine_tune_learning_rate menor (0.00005) e weight_decay levemente maior para reduzir risco de overfitting, especialmente porque B3 tem mais capacidade e as classes raras possuem poucos exemplos."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "EfficientNetB3"
+experiment_name = "refine_macro_f1_r2"
+batch_size = 8
+num_epochs = 30
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00005
+early_stopping = true
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "weighted"
+patience = 7
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0002
+scheduler_factor = 0.5
+scheduler_patience = 3
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "mobilenetv3_com_fundo_refine_macro_f1_r2"
+enabled = false
+tags = ["rtx3070-8gb", "refinamento-r2", "com_fundo", "eficiencia", "mobilenet", "macro-f1", "weighted", "stratified", "deploy-candidato"]
+notes = "Candidato eficiente para producao ou iteracoes rapidas. MobileNetV3 experimental com_fundo chegou perto dos EfficientNets com treino muito mais barato. Mantem weighted sampler, split estratificado e checkpoint por val_macro_f1 para preservar desempenho nas classes minoritarias, mas usa 30 epocas com early stopping para testar se ainda ha ganho de convergencia. Serve como baseline de custo-beneficio contra B2/B3: se ficar dentro de aproximadamente 0.5 a 1.0 ponto de macro F1 do B2, pode ser preferivel para deploy."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "MobileNetV3"
+experiment_name = "refine_macro_f1_r2"
+batch_size = 32
+num_epochs = 30
+learning_rate = 0.00012
+fine_tune_learning_rate = 0.00008
+early_stopping = true
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "weighted"
+patience = 7
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.00015
+scheduler_factor = 0.5
+scheduler_patience = 3
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "mobilenetv3_com_fundo_refine_no_sampler_r2"
+enabled = false
+tags = ["rtx3070-8gb", "refinamento-r2", "com_fundo", "ablacao", "eficiencia", "mobilenet", "macro-f1", "no-weighted-sampler", "stratified"]
+notes = "Ablacao leve e barata para checar se o weighted sampler realmente ajuda no MobileNetV3. Como o modelo e rapido, este teste fornece sinal barato antes de gastar tempo nos EfficientNets. Mantem checkpoint por val_macro_f1 e split estratificado, mas usa shuffle para reduzir repeticao de classes raras. Comparar principalmente F1 de INSETOS, ESVERDEADO, CHOCHOS e PURPURAS contra mobilenetv3_com_fundo_refine_macro_f1_r2."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "MobileNetV3"
+experiment_name = "refine_no_sampler_r2"
+batch_size = 32
+num_epochs = 30
+learning_rate = 0.00012
+fine_tune_learning_rate = 0.00008
+early_stopping = true
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "shuffle"
+patience = 7
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.00015
+scheduler_factor = 0.5
+scheduler_patience = 3
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "mobilenetv3_sem_fundo_experimental"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "sem_fundo", "experimental", "mobilenet"]
+notes = "MobileNetV3 experimental testa split estratificado, sampler ponderado e checkpoint por macro F1. Batch 32 aumenta ocupacao da GPU mantendo margem de memoria."
+dataset_name = "sem_fundo"
+data_path = "data/sem_fundo"
+model_name = "MobileNetV3"
+experiment_name = "experimental"
+batch_size = 32
+num_epochs = 20
+learning_rate = 0.00015
+fine_tune_learning_rate = 0.0001
+early_stopping = false
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "weighted"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb0_sem_fundo_baseline"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "sem_fundo", "baseline", "efficientnet"]
+notes = "EfficientNetB0 foi escolhido como alternativa rapida e competitiva. Batch 16 e adequado para a RTX 3070 de 8 GB e reduz overhead por batch."
+dataset_name = "sem_fundo"
+data_path = "data/sem_fundo"
+model_name = "EfficientNetB0"
+experiment_name = "baseline"
+batch_size = 16
+num_epochs = 20
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00008
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb0_sem_fundo_experimental"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "sem_fundo", "experimental", "efficientnet"]
+notes = "EfficientNetB0 experimental mede o ganho de estratificacao e sampler ponderado. Batch 16 aproveita melhor a GPU sem acumulacao."
+dataset_name = "sem_fundo"
+data_path = "data/sem_fundo"
+model_name = "EfficientNetB0"
+experiment_name = "experimental"
+batch_size = 16
+num_epochs = 20
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00008
+early_stopping = false
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "weighted"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb2_sem_fundo_baseline"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "sem_fundo", "baseline", "efficientnet"]
+notes = "EfficientNetB2 entra por ter boa acuracia entre EfficientNets ja testados. Batch 12 melhora uso da RTX 3070 mantendo margem para processos graficos."
+dataset_name = "sem_fundo"
+data_path = "data/sem_fundo"
+model_name = "EfficientNetB2"
+experiment_name = "baseline"
+batch_size = 12
+num_epochs = 20
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00008
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb2_sem_fundo_experimental"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "sem_fundo", "experimental", "efficientnet"]
+notes = "EfficientNetB2 experimental verifica se macro F1 melhora com split estratificado e weighted sampler. Batch 12 aumenta throughput sem ficar agressivo para 8 GB."
+dataset_name = "sem_fundo"
+data_path = "data/sem_fundo"
+model_name = "EfficientNetB2"
+experiment_name = "experimental"
+batch_size = 12
+num_epochs = 20
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00008
+early_stopping = false
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "weighted"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb3_sem_fundo_baseline"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "sem_fundo", "baseline", "efficientnet"]
+notes = "EfficientNetB3 e o ponto intermediario entre B2 e B7. Batch real 8 usa melhor a RTX 3070 com accumulation_steps 1 e mixed precision."
+dataset_name = "sem_fundo"
+data_path = "data/sem_fundo"
+model_name = "EfficientNetB3"
+experiment_name = "baseline"
+batch_size = 8
+num_epochs = 20
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00007
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb3_sem_fundo_experimental"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "sem_fundo", "experimental", "efficientnet"]
+notes = "EfficientNetB3 experimental combina custo moderado com metricas voltadas a desbalanceamento. Batch real 8 reduz overhead e deve caber na RTX 3070 com mixed precision."
+dataset_name = "sem_fundo"
+data_path = "data/sem_fundo"
+model_name = "EfficientNetB3"
+experiment_name = "experimental"
+batch_size = 8
+num_epochs = 20
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00007
+early_stopping = false
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "weighted"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "mobilenetv3_com_fundo_baseline"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "com_fundo", "baseline", "mobilenet"]
+notes = "MobileNetV3 em com_fundo mede se o modelo leve se mantem competitivo quando o fundo esta presente. Batch 32 aproveita melhor a RTX 3070 de 8 GB."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "MobileNetV3"
+experiment_name = "baseline"
+batch_size = 32
+num_epochs = 20
+learning_rate = 0.00015
+fine_tune_learning_rate = 0.0001
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "mobilenetv3_com_fundo_experimental"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "com_fundo", "experimental", "mobilenet"]
+notes = "MobileNetV3 experimental em com_fundo testa robustez com classes desbalanceadas usando macro F1. Batch 32 aumenta ocupacao da GPU."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "MobileNetV3"
+experiment_name = "experimental"
+batch_size = 32
+num_epochs = 20
+learning_rate = 0.00015
+fine_tune_learning_rate = 0.0001
+early_stopping = false
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "weighted"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb0_com_fundo_baseline"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "com_fundo", "baseline", "efficientnet"]
+notes = "EfficientNetB0 em com_fundo serve como EfficientNet mais barato da comparacao. Batch 16 melhora throughput na RTX 3070 mantendo configuracao conservadora."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "EfficientNetB0"
+experiment_name = "baseline"
+batch_size = 16
+num_epochs = 20
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00008
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb0_com_fundo_experimental"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "com_fundo", "experimental", "efficientnet"]
+notes = "EfficientNetB0 experimental em com_fundo avalia ganhos de sampler ponderado e checkpoint por macro F1. Batch 16 usa melhor a GPU sem acumulacao."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "EfficientNetB0"
+experiment_name = "experimental"
+batch_size = 16
+num_epochs = 20
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00008
+early_stopping = false
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "weighted"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb2_com_fundo_baseline"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "com_fundo", "baseline", "efficientnet"]
+notes = "EfficientNetB2 em com_fundo testa maior capacidade que B0 sem chegar ao custo do B3/B7. Batch 12 melhora uso da RTX 3070 mantendo margem de memoria."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "EfficientNetB2"
+experiment_name = "baseline"
+batch_size = 12
+num_epochs = 20
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00008
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb2_com_fundo_experimental"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "com_fundo", "experimental", "efficientnet"]
+notes = "EfficientNetB2 experimental em com_fundo mede impacto de macro F1 e weighted sampler. Batch 12 aumenta throughput sem ficar agressivo para 8 GB."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "EfficientNetB2"
+experiment_name = "experimental"
+batch_size = 12
+num_epochs = 20
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00008
+early_stopping = false
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "weighted"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb3_com_fundo_baseline"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "com_fundo", "baseline", "efficientnet"]
+notes = "EfficientNetB3 em com_fundo e o candidato mais pesado da comparacao padrao. Batch real 8 usa melhor a RTX 3070 com accumulation_steps 1 e mixed precision."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "EfficientNetB3"
+experiment_name = "baseline"
+batch_size = 8
+num_epochs = 20
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00007
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2
+
+[[jobs]]
+id = "efficientnetb3_com_fundo_experimental"
+enabled = true
+tags = ["rtx3070-8gb", "comparacao-principal", "com_fundo", "experimental", "efficientnet"]
+notes = "EfficientNetB3 experimental em com_fundo prioriza macro F1 em um modelo de maior capacidade. Batch real 8 reduz overhead e deve caber na RTX 3070 com mixed precision."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "EfficientNetB3"
+experiment_name = "experimental"
+batch_size = 8
+num_epochs = 20
+learning_rate = 0.0001
+fine_tune_learning_rate = 0.00007
+early_stopping = false
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "weighted"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.0001
+scheduler_factor = 0.5
+scheduler_patience = 2
+scheduler_min_lr = 0.000001
+accumulation_steps = 1
+freeze_backbone_epochs = 2

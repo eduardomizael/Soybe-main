@@ -32,6 +32,12 @@ class TrainingConfig(BaseModel):
     split_strategy: str = "random"
     checkpoint_metric: str = "val_loss"
     sampler_strategy: str = "shuffle"
+    loss_name: str = "cross_entropy"
+    class_weight_strategy: str = "sqrt_inverse"
+    label_smoothing: float = 0.0
+    focal_gamma: float = 1.5
+    effective_number_beta: float = 0.999
+    augmentation_profile: str = "standard"
     train_split: float = 0.8
     val_split: float = 0.1
     seed: int = 42

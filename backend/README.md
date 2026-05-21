@@ -112,29 +112,53 @@ Para executar treinamentos em sequencia:
 python -m backend.train_pipeline
 ```
 
-Edite a lista `PIPELINE` em `backend/train_pipeline.py` antes de rodar.
+Os jobs ficam em `backend/training_jobs.toml`. Cada bloco `[[jobs]]` contem todos os parametros do treinamento, incluindo `notes` e `tags`.
+
+Filtros disponiveis:
+
+```bash
+python -m backend.train_pipeline --id mobilenetv3_sem_fundo_baseline
+python -m backend.train_pipeline --dataset sem_fundo
+python -m backend.train_pipeline --model MobileNetV3
+python -m backend.train_pipeline --experiment experimental
+python -m backend.train_pipeline --tag rtx3070-8gb
+```
+
+Os filtros podem ser combinados. Sem filtros, todos os jobs habilitados (`enabled = true`) sao executados.
+
+Ao iniciar, a pipeline cria um arquivo em `models/pipeline_runs/pipeline_run_<timestamp>.json` com todos os jobs selecionados. O status de cada job e atualizado durante a execucao (`pending`, `running`, `success`, `error`). Para retomar a mesma fila depois de parar no meio:
+
+```bash
+python -m backend.train_pipeline --run-file models/pipeline_runs/pipeline_run_<timestamp>.json
+```
+
+Jobs com `status = "success"` sao pulados na retomada. Para reexecuta-los:
+
+```bash
+python -m backend.train_pipeline --run-file models/pipeline_runs/pipeline_run_<timestamp>.json --rerun-completed
+```
 
 Para forcar um job a rodar ate `num_epochs`, use:
 
-```python
-"early_stopping": False
+```toml
+early_stopping = false
 ```
 
 Mesmo com early stopping desativado, o servico continua salvando o melhor checkpoint pelo `checkpoint_metric` configurado.
 
 Para comparar modelos com uma configuracao mais adequada a datasets desbalanceados, use:
 
-```python
-"split_strategy": "stratified",
-"checkpoint_metric": "val_macro_f1",
-"sampler_strategy": "weighted"
+```toml
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "weighted"
 ```
 
 Com `checkpoint_metric: "val_macro_f1"`, o melhor checkpoint passa a ser escolhido por macro F1 de validacao. O `val_loss` continua sendo registrado e usado pelo scheduler.
 
 Os resultados finais incluem o bloco `efficiency` com throughput de treino, throughput de teste, contagem de parametros e tamanho do checkpoint.
 
-A pipeline CLI gera automaticamente dois experimentos por modelo candidato:
+A configuracao padrao em `training_jobs.toml` lista explicitamente dois experimentos por modelo candidato:
 
 - `baseline`: `random` + `shuffle` + checkpoint por `val_loss` + early stopping.
 - `experimental`: `stratified` + `weighted` + checkpoint por `val_macro_f1` + treino ate o fim.
@@ -146,7 +170,7 @@ Modelos candidatos padrao:
 - `EfficientNetB2`
 - `EfficientNetB3`
 
-`ResNet50` e `EfficientNetB7` permanecem parametrizados no arquivo, mas ficam fora da comparacao padrao por custo/beneficio inferior nos relatorios atuais.
+`ResNet50` e `EfficientNetB7` podem ser adicionados como novos blocos `[[jobs]]`, mas ficam fora da comparacao padrao por custo/beneficio inferior nos relatorios atuais.
 
 Artefatos gerados em `models/`:
 
@@ -154,6 +178,7 @@ Artefatos gerados em `models/`:
 - relatorio `.txt` por treinamento;
 - `*_error.txt` em falhas;
 - `pipeline_summary_<timestamp>.txt`.
+- `pipeline_runs/pipeline_run_<timestamp>.json` com estado retomavel da execucao.
 
 ## Validacao
 

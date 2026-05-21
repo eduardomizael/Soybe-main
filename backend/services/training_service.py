@@ -310,16 +310,49 @@ def _safe_name(value: str) -> str:
     return "_".join(part for part in safe.split("_") if part)
 
 
-def _build_train_transforms(input_size: int):
-    """Transforms agressivos exclusivos para treinamento (lida com desbalanceamento)."""
-    return T.Compose([
-        T.RandomResizedCrop(input_size, scale=(0.8, 1.0)),
+def _build_train_transforms(input_size: int, augmentation_profile: str = "standard"):
+    """Transforms de treinamento configuraveis por perfil."""
+    profiles = {
+        # Mantem o comportamento historico da pipeline.
+        "standard": {
+            "scale": (0.8, 1.0),
+            "rotation": 15,
+            "color_jitter": dict(brightness=0.2, contrast=0.2, saturation=0.2),
+        },
+        # Menos agressivo em cor e crop para classes onde cor e formato fino
+        # carregam sinal semantico, como ESVERDEADO, PURPURAS e CHOCHOS.
+        "conservative_color": {
+            "scale": (0.9, 1.0),
+            "rotation": 10,
+            "color_jitter": dict(brightness=0.08, contrast=0.08, saturation=0.08),
+        },
+        # Remove jitter de cor para testar se variacao cromatica esta apagando
+        # fronteiras entre classes dependentes de cor.
+        "no_color_jitter": {
+            "scale": (0.9, 1.0),
+            "rotation": 10,
+            "color_jitter": None,
+        },
+    }
+    profile = profiles.get(augmentation_profile)
+    if profile is None:
+        raise ValueError(
+            "augmentation_profile deve ser 'standard', 'conservative_color' "
+            f"ou 'no_color_jitter'. Recebido: {augmentation_profile}"
+        )
+
+    transforms = [
+        T.RandomResizedCrop(input_size, scale=profile["scale"]),
         T.RandomHorizontalFlip(),
-        T.RandomRotation(15),
-        T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        T.RandomRotation(profile["rotation"]),
+    ]
+    if profile["color_jitter"]:
+        transforms.append(T.ColorJitter(**profile["color_jitter"]))
+    transforms.extend([
         T.ToTensor(),
         T.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     ])
+    return T.Compose(transforms)
 
 
 def _build_val_transforms(input_size: int):
@@ -329,6 +362,85 @@ def _build_val_transforms(input_size: int):
         T.ToTensor(),
         T.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     ])
+
+
+def _build_class_weights(
+    class_counts: np.ndarray,
+    strategy: str = "sqrt_inverse",
+    effective_beta: float = 0.999,
+) -> np.ndarray:
+    """Calcula pesos de classe normalizados para media aproximada 1."""
+    counts = class_counts.astype(np.float64)
+
+    if strategy == "none":
+        weights = np.ones_like(counts, dtype=np.float64)
+    elif strategy == "sqrt_inverse":
+        weights = 1.0 / np.sqrt(counts + 1e-8)
+    elif strategy == "inverse":
+        weights = 1.0 / (counts + 1e-8)
+    elif strategy == "effective_number":
+        beta = float(effective_beta)
+        if not 0.0 < beta < 1.0:
+            raise ValueError("effective_number_beta deve estar entre 0 e 1.")
+        effective_num = 1.0 - np.power(beta, counts)
+        weights = (1.0 - beta) / np.maximum(effective_num, 1e-8)
+    else:
+        raise ValueError(
+            "class_weight_strategy deve ser 'sqrt_inverse', 'inverse', "
+            f"'effective_number' ou 'none'. Recebido: {strategy}"
+        )
+
+    weights = weights / np.sum(weights) * len(weights)
+    return weights
+
+
+class FocalLoss(nn.Module):
+    """Focal Loss multi-classe com pesos e label smoothing opcionais."""
+
+    def __init__(
+        self,
+        weight: torch.Tensor | None = None,
+        gamma: float = 1.5,
+        label_smoothing: float = 0.0,
+    ):
+        super().__init__()
+        self.gamma = float(gamma)
+        self.label_smoothing = float(label_smoothing)
+        self.register_buffer("weight", weight if weight is not None else None)
+
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        ce_loss = nn.functional.cross_entropy(
+            inputs,
+            targets,
+            weight=self.weight,
+            reduction="none",
+            label_smoothing=self.label_smoothing,
+        )
+        pt = torch.exp(-ce_loss)
+        focal_loss = ((1.0 - pt) ** self.gamma) * ce_loss
+        return focal_loss.mean()
+
+
+def _build_criterion(
+    loss_name: str,
+    class_weights: torch.Tensor | None,
+    label_smoothing: float = 0.0,
+    focal_gamma: float = 1.5,
+) -> nn.Module:
+    if loss_name == "cross_entropy":
+        return nn.CrossEntropyLoss(
+            weight=class_weights,
+            label_smoothing=float(label_smoothing),
+        )
+    if loss_name == "focal":
+        return FocalLoss(
+            weight=class_weights,
+            gamma=float(focal_gamma),
+            label_smoothing=float(label_smoothing),
+        )
+    raise ValueError(
+        f"loss_name deve ser 'cross_entropy' ou 'focal'. Recebido: {loss_name}"
+    )
 
 
 # ──────────────────────── Dataset scanning ────────────────────────
@@ -493,6 +605,12 @@ class TrainingManager:
         split_strategy = config.get("split_strategy", "random")
         checkpoint_metric = config.get("checkpoint_metric", "val_loss")
         sampler_strategy = config.get("sampler_strategy", "shuffle")
+        loss_name = config.get("loss_name", "cross_entropy")
+        class_weight_strategy = config.get("class_weight_strategy", "sqrt_inverse")
+        label_smoothing = float(config.get("label_smoothing", 0.0))
+        focal_gamma = float(config.get("focal_gamma", 1.5))
+        effective_number_beta = float(config.get("effective_number_beta", 0.999))
+        augmentation_profile = config.get("augmentation_profile", "standard")
         train_split = config.get("train_split", 0.8)
         val_split = config.get("val_split", 0.1)
         seed = int(config.get("seed", 42))
@@ -519,6 +637,36 @@ class TrainingManager:
             raise ValueError(
                 "sampler_strategy deve ser 'shuffle' ou 'weighted'. "
                 f"Recebido: {sampler_strategy}"
+            )
+        if loss_name not in {"cross_entropy", "focal"}:
+            raise ValueError(
+                "loss_name deve ser 'cross_entropy' ou 'focal'. "
+                f"Recebido: {loss_name}"
+            )
+        if class_weight_strategy not in {
+            "sqrt_inverse",
+            "inverse",
+            "effective_number",
+            "none",
+        }:
+            raise ValueError(
+                "class_weight_strategy deve ser 'sqrt_inverse', 'inverse', "
+                "'effective_number' ou 'none'. "
+                f"Recebido: {class_weight_strategy}"
+            )
+        if not 0.0 <= label_smoothing < 1.0:
+            raise ValueError("label_smoothing deve ser >= 0 e < 1.")
+        if focal_gamma < 0.0:
+            raise ValueError("focal_gamma deve ser >= 0.")
+        if augmentation_profile not in {
+            "standard",
+            "conservative_color",
+            "no_color_jitter",
+        }:
+            raise ValueError(
+                "augmentation_profile deve ser 'standard', "
+                "'conservative_color' ou 'no_color_jitter'. "
+                f"Recebido: {augmentation_profile}"
             )
 
         cfg = TRAINING_MODEL_CONFIGS[model_name]
@@ -573,7 +721,10 @@ class TrainingManager:
                 dataset, [train_size, val_size, test_size], generator=split_generator
             )
 
-        train_transforms = _build_train_transforms(cfg["input_size"])
+        train_transforms = _build_train_transforms(
+            cfg["input_size"],
+            augmentation_profile,
+        )
         val_transforms = _build_val_transforms(cfg["input_size"])
 
         train_ds = TransformSubset(train_ds_raw, transform=train_transforms)
@@ -586,10 +737,16 @@ class TrainingManager:
         targets = [dataset.targets[i] for i in train_indices]
         class_counts = np.bincount(targets, minlength=num_classes)
         
-        # Suaviza para evitar explodir em classes quase vazias: 1 / sqrt(N)
-        weights = 1.0 / np.sqrt(class_counts + 1e-8)
-        weights = (weights / np.sum(weights)) * num_classes
-        class_weights = torch.FloatTensor(weights).to(device)
+        weights = _build_class_weights(
+            class_counts,
+            class_weight_strategy,
+            effective_number_beta,
+        )
+        class_weights = (
+            None
+            if class_weight_strategy == "none"
+            else torch.FloatTensor(weights).to(device)
+        )
         sample_weights = torch.DoubleTensor([weights[target] for target in targets])
 
         loader_kwargs = dict(
@@ -634,7 +791,12 @@ class TrainingManager:
         model = _build_model(model_name, num_classes, device)
         if freeze_backbone_epochs > 0:
             _freeze_backbone(model, cfg["classifier_type"], freeze=True)
-        criterion = nn.CrossEntropyLoss(weight=class_weights)
+        criterion = _build_criterion(
+            loss_name,
+            class_weights,
+            label_smoothing,
+            focal_gamma,
+        )
         optimizer = _build_optimizer(config, model)
         scheduler = _build_scheduler(config, optimizer)
 
@@ -985,6 +1147,12 @@ class TrainingManager:
                 "split_strategy": split_strategy,
                 "checkpoint_metric": checkpoint_metric,
                 "sampler_strategy": sampler_strategy,
+                "loss_name": loss_name,
+                "class_weight_strategy": class_weight_strategy,
+                "label_smoothing": label_smoothing,
+                "focal_gamma": focal_gamma,
+                "effective_number_beta": effective_number_beta,
+                "augmentation_profile": augmentation_profile,
                 "seed": seed,
                 "accumulation_steps": accumulation_steps,
                 "effective_batch_size": batch_size * accumulation_steps,

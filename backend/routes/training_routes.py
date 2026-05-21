@@ -154,6 +154,51 @@ def _validate_training_options(config: TrainingConfig):
             status_code=400,
             detail="sampler_strategy deve ser 'shuffle' ou 'weighted'.",
         )
+    if config.loss_name not in {"cross_entropy", "focal"}:
+        raise HTTPException(
+            status_code=400,
+            detail="loss_name deve ser 'cross_entropy' ou 'focal'.",
+        )
+    if config.class_weight_strategy not in {
+        "sqrt_inverse",
+        "inverse",
+        "effective_number",
+        "none",
+    }:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "class_weight_strategy deve ser 'sqrt_inverse', 'inverse', "
+                "'effective_number' ou 'none'."
+            ),
+        )
+    if not 0.0 <= config.label_smoothing < 1.0:
+        raise HTTPException(
+            status_code=400,
+            detail="label_smoothing deve ser >= 0 e < 1.",
+        )
+    if config.focal_gamma < 0.0:
+        raise HTTPException(
+            status_code=400,
+            detail="focal_gamma deve ser >= 0.",
+        )
+    if not 0.0 < config.effective_number_beta < 1.0:
+        raise HTTPException(
+            status_code=400,
+            detail="effective_number_beta deve estar entre 0 e 1.",
+        )
+    if config.augmentation_profile not in {
+        "standard",
+        "conservative_color",
+        "no_color_jitter",
+    }:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "augmentation_profile deve ser 'standard', "
+                "'conservative_color' ou 'no_color_jitter'."
+            ),
+        )
 
 
 @router.post("/start")
@@ -186,6 +231,12 @@ async def start_training(config: TrainingConfig):
         "split_strategy": config.split_strategy,
         "checkpoint_metric": config.checkpoint_metric,
         "sampler_strategy": config.sampler_strategy,
+        "loss_name": config.loss_name,
+        "class_weight_strategy": config.class_weight_strategy,
+        "label_smoothing": config.label_smoothing,
+        "focal_gamma": config.focal_gamma,
+        "effective_number_beta": config.effective_number_beta,
+        "augmentation_profile": config.augmentation_profile,
         "train_split": config.train_split,
         "val_split": config.val_split,
         "seed": config.seed,
