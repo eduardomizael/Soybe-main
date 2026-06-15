@@ -281,7 +281,6 @@ def _validate_job(job: dict[str, Any]) -> dict[str, Any]:
         "model_name",
         "data_path",
         "dataset_name",
-        "batch_size",
         "num_epochs",
         "learning_rate",
         "patience",
@@ -386,13 +385,14 @@ def _validate_job(job: dict[str, Any]) -> dict[str, Any]:
 
 
 def _print_job_header(index: int, total: int, job: dict[str, Any]) -> None:
+    batch_size = job.get("batch_size", "model-default")
     print()
     print("=" * 72)
     print(
         f"[{index}/{total}] {job['id']} | {job['model_name']} | "
         f"experiment={job.get('experiment_name', 'default')} | "
         f"dataset={job.get('dataset_name', Path(job['data_path']).name)} | "
-        f"epochs={job['num_epochs']} | batch={job['batch_size']}"
+        f"epochs={job['num_epochs']} | batch={batch_size}"
     )
     if job.get("notes"):
         print(f"notes={job['notes']}")

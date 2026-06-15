@@ -170,13 +170,26 @@ def _build_optimizer(config: dict, model: torch.nn.Module):
     if not trainable_params:
         raise ValueError("Nenhum parâmetro treinável encontrado para o otimizador.")
 
+    if optimizer_name == "Adam":
+        return optim.Adam(trainable_params, lr=learning_rate)
     if optimizer_name != "AdamW":
-        raise ValueError(f"Otimizador não suportado: '{optimizer_name}'.")
+        raise ValueError(
+            f"Otimizador não suportado: '{optimizer_name}'. "
+            "Use 'AdamW' ou 'Adam'."
+        )
 
     return optim.AdamW(trainable_params, lr=learning_rate, weight_decay=weight_decay)
 
 
 def _build_scheduler(config: dict, optimizer):
+    scheduler_name = config.get("scheduler_name", "ReduceLROnPlateau")
+    if scheduler_name in {"none", "None", None}:
+        return None
+    if scheduler_name != "ReduceLROnPlateau":
+        raise ValueError(
+            f"scheduler_name não suportado: '{scheduler_name}'. "
+            "Use 'ReduceLROnPlateau' ou 'none'."
+        )
     return optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
         mode="min",
@@ -598,7 +611,7 @@ class TrainingManager:
         model_name = config["model_name"]
         experiment_name = config.get("experiment_name", "default")
         data_path = config["data_path"]
-        batch_size = config.get("batch_size", 16)
+        configured_batch_size = config.get("batch_size")
         num_epochs = config.get("num_epochs", 20)
         patience = config.get("patience", 5)
         early_stopping = bool(config.get("early_stopping", True))
@@ -614,6 +627,7 @@ class TrainingManager:
         train_split = config.get("train_split", 0.8)
         val_split = config.get("val_split", 0.1)
         seed = int(config.get("seed", 42))
+        use_seed = bool(config.get("use_seed", True))
         accumulation_steps = max(1, int(config.get("accumulation_steps", 1)))
         freeze_backbone_epochs = max(0, int(config.get("freeze_backbone_epochs", 0)))
         fine_tune_learning_rate = config.get(
@@ -670,7 +684,13 @@ class TrainingManager:
             )
 
         cfg = TRAINING_MODEL_CONFIGS[model_name]
-        _set_seed(seed)
+        batch_size = int(
+            configured_batch_size
+            if configured_batch_size is not None
+            else cfg["default_batch"]
+        )
+        if use_seed:
+            _set_seed(seed)
 
         # ── Device & runtime ──
         device, num_workers, pin_memory, persistent_workers, prefetch_factor = (
@@ -716,10 +736,17 @@ class TrainingManager:
             val_size = len(val_ds_raw)
             test_size = len(test_ds_raw)
         else:
-            split_generator = torch.Generator().manual_seed(seed)
-            train_ds_raw, val_ds_raw, test_ds_raw = random_split(
-                dataset, [train_size, val_size, test_size], generator=split_generator
-            )
+            if use_seed:
+                split_generator = torch.Generator().manual_seed(seed)
+                train_ds_raw, val_ds_raw, test_ds_raw = random_split(
+                    dataset,
+                    [train_size, val_size, test_size],
+                    generator=split_generator,
+                )
+            else:
+                train_ds_raw, val_ds_raw, test_ds_raw = random_split(
+                    dataset, [train_size, val_size, test_size]
+                )
 
         train_transforms = _build_train_transforms(
             cfg["input_size"],
@@ -956,7 +983,8 @@ class TrainingManager:
                 "val_macro_f1": epoch_val_macro_f1,
             }[checkpoint_metric]
             elapsed = time.time() - start_time
-            scheduler.step(epoch_val_loss)
+            if scheduler is not None:
+                scheduler.step(epoch_val_loss)
             current_lr = float(optimizer.param_groups[0]["lr"])
 
             epoch_history.append({
@@ -1142,7 +1170,7 @@ class TrainingManager:
                 "pin_memory": pin_memory,
                 "mixed_precision": use_amp,
                 "optimizer": config.get("optimizer_name", "AdamW"),
-                "scheduler": "ReduceLROnPlateau",
+                "scheduler": config.get("scheduler_name", "ReduceLROnPlateau"),
                 "early_stopping": early_stopping,
                 "split_strategy": split_strategy,
                 "checkpoint_metric": checkpoint_metric,
@@ -1154,6 +1182,7 @@ class TrainingManager:
                 "effective_number_beta": effective_number_beta,
                 "augmentation_profile": augmentation_profile,
                 "seed": seed,
+                "use_seed": use_seed,
                 "accumulation_steps": accumulation_steps,
                 "effective_batch_size": batch_size * accumulation_steps,
                 "freeze_backbone_epochs": freeze_backbone_epochs,

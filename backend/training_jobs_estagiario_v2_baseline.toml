@@ -1,0 +1,332 @@
+# Baseline com parametros equivalentes aos defaults da branch estagiario_v2.
+#
+# Objetivo:
+# - reproduzir o comportamento de treino legado da estagiario_v2;
+# - treinar todos os modelos disponiveis exceto EfficientNetB7;
+# - executar um job por modelo e dataset.
+#
+# Execucao:
+#   uv run python -m backend.train_pipeline --config backend/training_jobs_estagiario_v2_baseline.toml
+#
+# Compatibilidade estagiario_v2:
+# - batch_size = 16
+# - num_epochs = 20
+# - learning_rate = 0.0001
+# - patience = 5
+# - train_split = 0.8
+# - val_split = 0.1
+# - optimizer_name = "Adam"
+# - scheduler_name = "none"
+# - checkpoint_metric = "val_loss"
+# - class_weight_strategy = "sqrt_inverse"
+# - use_seed = false, pois a branch antiga nao fixava o random_split.
+
+[[jobs]]
+id = "mobilenetv3_com_fundo_estagiario_v2_seed42"
+enabled = true
+tags = ["baseline-estagiario-v2", "seed-42", "com_fundo", "mobilenet"]
+notes = "Baseline que emula os defaults da branch estagiario_v2. O seed fica registrado, mas use_seed=false reproduz o split nao deterministico antigo."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "MobileNetV3"
+experiment_name = "estagiario_v2_seed42"
+batch_size = 16
+num_epochs = 20
+learning_rate = 0.0001
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+loss_name = "cross_entropy"
+class_weight_strategy = "sqrt_inverse"
+label_smoothing = 0.0
+focal_gamma = 1.5
+augmentation_profile = "standard"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+use_seed = false
+optimizer_name = "Adam"
+scheduler_name = "none"
+accumulation_steps = 1
+freeze_backbone_epochs = 0
+
+[[jobs]]
+id = "mobilenetv3_sem_fundo_estagiario_v2_seed42"
+enabled = true
+tags = ["baseline-estagiario-v2", "seed-42", "sem_fundo", "mobilenet"]
+notes = "Baseline que emula os defaults da branch estagiario_v2. O seed fica registrado, mas use_seed=false reproduz o split nao deterministico antigo."
+dataset_name = "sem_fundo"
+data_path = "data/sem_fundo"
+model_name = "MobileNetV3"
+experiment_name = "estagiario_v2_seed42"
+batch_size = 16
+num_epochs = 20
+learning_rate = 0.0001
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+loss_name = "cross_entropy"
+class_weight_strategy = "sqrt_inverse"
+label_smoothing = 0.0
+focal_gamma = 1.5
+augmentation_profile = "standard"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+use_seed = false
+optimizer_name = "Adam"
+scheduler_name = "none"
+accumulation_steps = 1
+freeze_backbone_epochs = 0
+
+[[jobs]]
+id = "efficientnetb0_com_fundo_estagiario_v2_seed42"
+enabled = true
+tags = ["baseline-estagiario-v2", "seed-42", "com_fundo", "efficientnet", "efficientnetb0"]
+notes = "Baseline que emula os defaults da branch estagiario_v2. O seed fica registrado, mas use_seed=false reproduz o split nao deterministico antigo."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "EfficientNetB0"
+experiment_name = "estagiario_v2_seed42"
+batch_size = 16
+num_epochs = 20
+learning_rate = 0.0001
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+loss_name = "cross_entropy"
+class_weight_strategy = "sqrt_inverse"
+label_smoothing = 0.0
+focal_gamma = 1.5
+augmentation_profile = "standard"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+use_seed = false
+optimizer_name = "Adam"
+scheduler_name = "none"
+accumulation_steps = 1
+freeze_backbone_epochs = 0
+
+[[jobs]]
+id = "efficientnetb0_sem_fundo_estagiario_v2_seed42"
+enabled = true
+tags = ["baseline-estagiario-v2", "seed-42", "sem_fundo", "efficientnet", "efficientnetb0"]
+notes = "Baseline que emula os defaults da branch estagiario_v2. O seed fica registrado, mas use_seed=false reproduz o split nao deterministico antigo."
+dataset_name = "sem_fundo"
+data_path = "data/sem_fundo"
+model_name = "EfficientNetB0"
+experiment_name = "estagiario_v2_seed42"
+batch_size = 16
+num_epochs = 20
+learning_rate = 0.0001
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+loss_name = "cross_entropy"
+class_weight_strategy = "sqrt_inverse"
+label_smoothing = 0.0
+focal_gamma = 1.5
+augmentation_profile = "standard"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+use_seed = false
+optimizer_name = "Adam"
+scheduler_name = "none"
+accumulation_steps = 1
+freeze_backbone_epochs = 0
+
+[[jobs]]
+id = "efficientnetb2_com_fundo_estagiario_v2_seed42"
+enabled = true
+tags = ["baseline-estagiario-v2", "seed-42", "com_fundo", "efficientnet", "efficientnetb2"]
+notes = "Baseline que emula os defaults da branch estagiario_v2. O seed fica registrado, mas use_seed=false reproduz o split nao deterministico antigo."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "EfficientNetB2"
+experiment_name = "estagiario_v2_seed42"
+batch_size = 16
+num_epochs = 20
+learning_rate = 0.0001
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+loss_name = "cross_entropy"
+class_weight_strategy = "sqrt_inverse"
+label_smoothing = 0.0
+focal_gamma = 1.5
+augmentation_profile = "standard"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+use_seed = false
+optimizer_name = "Adam"
+scheduler_name = "none"
+accumulation_steps = 1
+freeze_backbone_epochs = 0
+
+[[jobs]]
+id = "efficientnetb2_sem_fundo_estagiario_v2_seed42"
+enabled = true
+tags = ["baseline-estagiario-v2", "seed-42", "sem_fundo", "efficientnet", "efficientnetb2"]
+notes = "Baseline que emula os defaults da branch estagiario_v2. O seed fica registrado, mas use_seed=false reproduz o split nao deterministico antigo."
+dataset_name = "sem_fundo"
+data_path = "data/sem_fundo"
+model_name = "EfficientNetB2"
+experiment_name = "estagiario_v2_seed42"
+batch_size = 16
+num_epochs = 20
+learning_rate = 0.0001
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+loss_name = "cross_entropy"
+class_weight_strategy = "sqrt_inverse"
+label_smoothing = 0.0
+focal_gamma = 1.5
+augmentation_profile = "standard"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+use_seed = false
+optimizer_name = "Adam"
+scheduler_name = "none"
+accumulation_steps = 1
+freeze_backbone_epochs = 0
+
+[[jobs]]
+id = "efficientnetb3_com_fundo_estagiario_v2_seed42"
+enabled = true
+tags = ["baseline-estagiario-v2", "seed-42", "com_fundo", "efficientnet", "efficientnetb3"]
+notes = "Baseline que emula os defaults da branch estagiario_v2. O seed fica registrado, mas use_seed=false reproduz o split nao deterministico antigo."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "EfficientNetB3"
+experiment_name = "estagiario_v2_seed42"
+batch_size = 16
+num_epochs = 20
+learning_rate = 0.0001
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+loss_name = "cross_entropy"
+class_weight_strategy = "sqrt_inverse"
+label_smoothing = 0.0
+focal_gamma = 1.5
+augmentation_profile = "standard"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+use_seed = false
+optimizer_name = "Adam"
+scheduler_name = "none"
+accumulation_steps = 1
+freeze_backbone_epochs = 0
+
+[[jobs]]
+id = "efficientnetb3_sem_fundo_estagiario_v2_seed42"
+enabled = true
+tags = ["baseline-estagiario-v2", "seed-42", "sem_fundo", "efficientnet", "efficientnetb3"]
+notes = "Baseline que emula os defaults da branch estagiario_v2. O seed fica registrado, mas use_seed=false reproduz o split nao deterministico antigo."
+dataset_name = "sem_fundo"
+data_path = "data/sem_fundo"
+model_name = "EfficientNetB3"
+experiment_name = "estagiario_v2_seed42"
+batch_size = 16
+num_epochs = 20
+learning_rate = 0.0001
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+loss_name = "cross_entropy"
+class_weight_strategy = "sqrt_inverse"
+label_smoothing = 0.0
+focal_gamma = 1.5
+augmentation_profile = "standard"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+use_seed = false
+optimizer_name = "Adam"
+scheduler_name = "none"
+accumulation_steps = 1
+freeze_backbone_epochs = 0
+
+[[jobs]]
+id = "resnet50_com_fundo_estagiario_v2_seed42"
+enabled = true
+tags = ["baseline-estagiario-v2", "seed-42", "com_fundo", "resnet50"]
+notes = "Baseline que emula os defaults da branch estagiario_v2. O seed fica registrado, mas use_seed=false reproduz o split nao deterministico antigo."
+dataset_name = "com_fundo"
+data_path = "data/com_fundo"
+model_name = "ResNet50"
+experiment_name = "estagiario_v2_seed42"
+batch_size = 16
+num_epochs = 20
+learning_rate = 0.0001
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+loss_name = "cross_entropy"
+class_weight_strategy = "sqrt_inverse"
+label_smoothing = 0.0
+focal_gamma = 1.5
+augmentation_profile = "standard"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+use_seed = false
+optimizer_name = "Adam"
+scheduler_name = "none"
+accumulation_steps = 1
+freeze_backbone_epochs = 0
+
+[[jobs]]
+id = "resnet50_sem_fundo_estagiario_v2_seed42"
+enabled = true
+tags = ["baseline-estagiario-v2", "seed-42", "sem_fundo", "resnet50"]
+notes = "Baseline que emula os defaults da branch estagiario_v2. O seed fica registrado, mas use_seed=false reproduz o split nao deterministico antigo."
+dataset_name = "sem_fundo"
+data_path = "data/sem_fundo"
+model_name = "ResNet50"
+experiment_name = "estagiario_v2_seed42"
+batch_size = 16
+num_epochs = 20
+learning_rate = 0.0001
+early_stopping = true
+split_strategy = "random"
+checkpoint_metric = "val_loss"
+sampler_strategy = "shuffle"
+loss_name = "cross_entropy"
+class_weight_strategy = "sqrt_inverse"
+label_smoothing = 0.0
+focal_gamma = 1.5
+augmentation_profile = "standard"
+patience = 5
+train_split = 0.8
+val_split = 0.1
+seed = 42
+use_seed = false
+optimizer_name = "Adam"
+scheduler_name = "none"
+accumulation_steps = 1
+freeze_backbone_epochs = 0
