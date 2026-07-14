@@ -12,6 +12,7 @@ import time
 import threading
 import json
 from datetime import datetime
+from pathlib import Path
 from typing import Callable, Optional
 
 import torch
@@ -19,6 +20,7 @@ import numpy as np
 from torch import nn, optim
 from torch.utils.data import DataLoader, Subset, WeightedRandomSampler, random_split
 from torchvision.datasets import ImageFolder
+from torchvision.datasets.folder import IMG_EXTENSIONS, default_loader, has_file_allowed_extension
 import torchvision.transforms as T
 import torchvision
 from torchvision.models import (
@@ -213,6 +215,151 @@ class TransformSubset(torch.utils.data.Dataset):
         
     def __len__(self):
         return len(self.subset)
+
+
+PREDEFINED_SPLIT_ALIASES = {
+    "train": ("train", "treino"),
+    "val": ("val", "valid", "validation", "validacao"),
+    "test": ("test", "teste"),
+}
+
+
+class PredefinedClassFirstDataset(torch.utils.data.Dataset):
+    """Dataset para layout <classe>/<split>/imagem, mantendo indices de classe globais."""
+
+    def __init__(self, classes: list[str], split_dirs: dict[str, Path]):
+        self.classes = classes
+        self.class_to_idx = {class_name: idx for idx, class_name in enumerate(classes)}
+        self.samples: list[tuple[str, int]] = []
+
+        for class_name in classes:
+            class_idx = self.class_to_idx[class_name]
+            split_dir = split_dirs[class_name]
+            for path in sorted(split_dir.rglob("*")):
+                if path.is_file() and has_file_allowed_extension(str(path), IMG_EXTENSIONS):
+                    self.samples.append((str(path), class_idx))
+
+        if not self.samples:
+            raise ValueError("Nenhuma imagem encontrada no split predefinido.")
+
+        self.targets = [target for _, target in self.samples]
+        self._validate_class_coverage()
+
+    def __getitem__(self, index):
+        path, target = self.samples[index]
+        return default_loader(path), target
+
+    def __len__(self):
+        return len(self.samples)
+
+    def _validate_class_coverage(self):
+        present = set(self.targets)
+        missing = [
+            class_name
+            for class_name, class_idx in self.class_to_idx.items()
+            if class_idx not in present
+        ]
+        if missing:
+            raise ValueError(
+                "Cada split predefinido deve ter pelo menos uma imagem por classe. "
+                f"Classes sem imagens: {', '.join(missing)}."
+            )
+
+
+def _find_alias_dir(parent: Path, aliases: tuple[str, ...]) -> Path | None:
+    alias_lookup = {alias.lower(): alias for alias in aliases}
+    for child in parent.iterdir():
+        if child.is_dir() and child.name.lower() in alias_lookup:
+            return child
+    return None
+
+
+def _load_split_first_predefined_dataset(root: Path):
+    split_dirs: dict[str, Path] = {}
+    for split_name, aliases in PREDEFINED_SPLIT_ALIASES.items():
+        split_dir = _find_alias_dir(root, aliases)
+        if split_dir is None:
+            return None
+        split_dirs[split_name] = split_dir
+
+    datasets = {
+        split_name: ImageFolder(root=str(split_dir), transform=None)
+        for split_name, split_dir in split_dirs.items()
+    }
+    class_names = datasets["train"].classes
+
+    for split_name, dataset in datasets.items():
+        if dataset.classes != class_names:
+            raise ValueError(
+                "Os splits predefinidos devem conter as mesmas classes. "
+                f"Classes em train: {class_names}; classes em {split_name}: {dataset.classes}."
+            )
+
+    return (
+        datasets["train"],
+        datasets["val"],
+        datasets["test"],
+        class_names,
+    )
+
+
+def _load_class_first_predefined_dataset(root: Path):
+    class_dirs = sorted(child for child in root.iterdir() if child.is_dir())
+    if not class_dirs:
+        return None
+
+    classes = [class_dir.name for class_dir in class_dirs]
+    split_dirs_by_split: dict[str, dict[str, Path]] = {
+        "train": {},
+        "val": {},
+        "test": {},
+    }
+
+    for class_dir in class_dirs:
+        for split_name, aliases in PREDEFINED_SPLIT_ALIASES.items():
+            split_dir = _find_alias_dir(class_dir, aliases)
+            if split_dir is None:
+                aliases_text = ", ".join(aliases)
+                raise ValueError(
+                    "Dataset com split predefinido incompleto. "
+                    f"Classe '{class_dir.name}' nao tem subdiretorio de {split_name} "
+                    f"({aliases_text})."
+                )
+            split_dirs_by_split[split_name][class_dir.name] = split_dir
+
+    return (
+        PredefinedClassFirstDataset(classes, split_dirs_by_split["train"]),
+        PredefinedClassFirstDataset(classes, split_dirs_by_split["val"]),
+        PredefinedClassFirstDataset(classes, split_dirs_by_split["test"]),
+        classes,
+    )
+
+
+def _load_predefined_split(data_path: str):
+    root = Path(data_path)
+    split_first = _load_split_first_predefined_dataset(root)
+    if split_first is not None:
+        return split_first
+
+    class_first = _load_class_first_predefined_dataset(root)
+    if class_first is not None:
+        return class_first
+
+    raise ValueError(
+        "Dataset com split_strategy='predefined' deve usar um destes layouts: "
+        "<dataset>/train/<classe>, <dataset>/val/<classe>, <dataset>/test/<classe>; "
+        "ou <dataset>/<classe>/treino, <dataset>/<classe>/val, <dataset>/<classe>/teste."
+    )
+
+
+def _dataset_targets(dataset) -> list[int]:
+    if hasattr(dataset, "targets"):
+        return list(dataset.targets)
+    if hasattr(dataset, "indices") and hasattr(dataset, "dataset"):
+        base_dataset = dataset.dataset
+        if hasattr(base_dataset, "targets"):
+            return [base_dataset.targets[index] for index in dataset.indices]
+    raise ValueError("Nao foi possivel obter os rotulos do dataset de treino.")
 
 
 def _split_class_indices(
@@ -637,9 +784,9 @@ class TrainingManager:
 
         if model_name not in TRAINING_MODEL_CONFIGS:
             raise ValueError(f"Modelo '{model_name}' não suportado.")
-        if split_strategy not in {"random", "stratified"}:
+        if split_strategy not in {"random", "stratified", "predefined"}:
             raise ValueError(
-                "split_strategy deve ser 'random' ou 'stratified'. "
+                "split_strategy deve ser 'random', 'stratified' ou 'predefined'. "
                 f"Recebido: {split_strategy}"
             )
         if checkpoint_metric not in {"val_loss", "val_accuracy", "val_macro_f1"}:
@@ -710,19 +857,29 @@ class TrainingManager:
 
         # ── Dataset ──
         # Carrega as imagens puras (sem transformações globais prejudiciais pra Val)
-        dataset = ImageFolder(root=data_path, transform=None)
-        num_classes = len(dataset.classes)
-        class_names = dataset.classes
-
-        total = len(dataset)
-        train_size = int(train_split * total)
-        val_size = int(val_split * total)
-        test_size = total - train_size - val_size
-
-        if train_size <= 0 or val_size <= 0 or test_size <= 0:
-            raise ValueError(
-                f"Dataset muito pequeno ({total} imagens) para os splits configurados."
+        if split_strategy == "predefined":
+            train_ds_raw, val_ds_raw, test_ds_raw, class_names = _load_predefined_split(
+                data_path
             )
+            num_classes = len(class_names)
+            train_size = len(train_ds_raw)
+            val_size = len(val_ds_raw)
+            test_size = len(test_ds_raw)
+            total = train_size + val_size + test_size
+        else:
+            dataset = ImageFolder(root=data_path, transform=None)
+            num_classes = len(dataset.classes)
+            class_names = dataset.classes
+
+            total = len(dataset)
+            train_size = int(train_split * total)
+            val_size = int(val_split * total)
+            test_size = total - train_size - val_size
+
+            if train_size <= 0 or val_size <= 0 or test_size <= 0:
+                raise ValueError(
+                    f"Dataset muito pequeno ({total} imagens) para os splits configurados."
+                )
 
         if split_strategy == "stratified":
             train_ds_raw, val_ds_raw, test_ds_raw = _stratified_split(
@@ -735,7 +892,7 @@ class TrainingManager:
             train_size = len(train_ds_raw)
             val_size = len(val_ds_raw)
             test_size = len(test_ds_raw)
-        else:
+        elif split_strategy == "random":
             if use_seed:
                 split_generator = torch.Generator().manual_seed(seed)
                 train_ds_raw, val_ds_raw, test_ds_raw = random_split(
@@ -760,8 +917,7 @@ class TrainingManager:
 
         # ── Class Weights ──
         callback({"type": "status", "message": "Calculando os pesos das classes..."})
-        train_indices = train_ds_raw.indices
-        targets = [dataset.targets[i] for i in train_indices]
+        targets = _dataset_targets(train_ds_raw)
         class_counts = np.bincount(targets, minlength=num_classes)
         
         weights = _build_class_weights(

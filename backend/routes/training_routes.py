@@ -136,10 +136,10 @@ def _validate_splits(train_split: float, val_split: float):
 
 
 def _validate_training_options(config: TrainingConfig):
-    if config.split_strategy not in {"random", "stratified"}:
+    if config.split_strategy not in {"random", "stratified", "predefined"}:
         raise HTTPException(
             status_code=400,
-            detail="split_strategy deve ser 'random' ou 'stratified'.",
+            detail="split_strategy deve ser 'random', 'stratified' ou 'predefined'.",
         )
     if config.checkpoint_metric not in {"val_loss", "val_accuracy", "val_macro_f1"}:
         raise HTTPException(
@@ -209,7 +209,8 @@ async def start_training(config: TrainingConfig):
 
     # Validações de segurança
     validated_path = _validate_data_path(config.data_path)
-    _validate_splits(config.train_split, config.val_split)
+    if config.split_strategy != "predefined":
+        _validate_splits(config.train_split, config.val_split)
     _validate_training_options(config)
 
     # Fix 3: get_running_loop() em vez de get_event_loop()

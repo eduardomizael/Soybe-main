@@ -276,6 +276,7 @@ def _append_job_parameters(lines: list[str], job: dict[str, Any]) -> None:
 
 
 def _validate_job(job: dict[str, Any]) -> dict[str, Any]:
+    split_strategy = job.get("split_strategy", "random")
     required_fields = [
         "id",
         "model_name",
@@ -284,9 +285,10 @@ def _validate_job(job: dict[str, Any]) -> dict[str, Any]:
         "num_epochs",
         "learning_rate",
         "patience",
-        "train_split",
-        "val_split",
     ]
+    if split_strategy != "predefined":
+        required_fields.extend(["train_split", "val_split"])
+
     missing = [field for field in required_fields if field not in job]
     if missing:
         raise ValueError(f"Job '{job.get('id', 'sem_id')}' sem campos: {', '.join(missing)}")
@@ -308,18 +310,18 @@ def _validate_job(job: dict[str, Any]) -> dict[str, Any]:
     if not data_path.is_dir():
         raise ValueError(f"Dataset não encontrado: '{data_path}'.")
 
-    train_split = float(job.get("train_split", 0.8))
-    val_split = float(job.get("val_split", 0.1))
-    if train_split + val_split >= 0.95:
-        raise ValueError(
-            f"Splits inválidos para '{model_name}': train_split + val_split deve ser < 0.95."
-        )
-
-    split_strategy = job.get("split_strategy", "random")
-    if split_strategy not in {"random", "stratified"}:
+    if split_strategy not in {"random", "stratified", "predefined"}:
         raise ValueError(
             f"split_strategy inválido para '{model_name}': {split_strategy}."
         )
+
+    if split_strategy != "predefined":
+        train_split = float(job.get("train_split", 0.8))
+        val_split = float(job.get("val_split", 0.1))
+        if train_split + val_split >= 0.95:
+            raise ValueError(
+                f"Splits inválidos para '{model_name}': train_split + val_split deve ser < 0.95."
+            )
 
     checkpoint_metric = job.get("checkpoint_metric", "val_loss")
     if checkpoint_metric not in {"val_loss", "val_accuracy", "val_macro_f1"}:
