@@ -21,6 +21,8 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Gera os 30 jobs RGB que completam 10 seeds.")
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--dataset", default="com_fundo", choices=["com_fundo", "sem_fundo"])
+    parser.add_argument("--data-path", type=Path)
     return parser.parse_args()
 
 
@@ -41,13 +43,13 @@ def _toml_value(value: Any) -> str:
     raise TypeError(f"Valor TOML nao suportado: {value!r}")
 
 
-def _source_jobs(path: Path) -> dict[str, dict[str, Any]]:
+def _source_jobs(path: Path, dataset: str) -> dict[str, dict[str, Any]]:
     with path.open("rb") as file:
         jobs = tomllib.load(file).get("jobs", [])
     selected = {
         job["model_name"]: job
         for job in jobs
-        if job.get("dataset_name") == "com_fundo"
+        if job.get("dataset_name") == dataset
         and job.get("seed") == 42
         and job.get("model_name") in MODEL_ORDER
     }
@@ -57,10 +59,10 @@ def _source_jobs(path: Path) -> dict[str, dict[str, Any]]:
     return selected
 
 
-def _expanded_job(source: dict[str, Any], model_name: str, seed: int, repeat: int) -> dict[str, Any]:
+def _expanded_job(source: dict[str, Any], model_name: str, seed: int, repeat: int, dataset: str, data_path: Path) -> dict[str, Any]:
     job = deepcopy(source)
     model_slug = _slug_model(model_name)
-    group = f"{model_slug}_com_fundo_best_candidate"
+    group = f"{model_slug}_{dataset}_best_candidate"
     job["id"] = f"{group}_seed{seed}"
     tags = [
         tag
@@ -78,7 +80,7 @@ def _expanded_job(source: dict[str, Any], model_name: str, seed: int, repeat: in
     job["tags"] = list(dict.fromkeys(tags))
     job["notes"] = (
         f"Expansao RGB para 10 seeds, repeticao {repeat}/10. "
-        f"Replica a receita experimental validada de {model_name} em com_fundo; "
+        f"Replica a receita experimental validada de {model_name} em {dataset}; "
         f"somente a seed muda para {seed}."
     )
     job["stat_group"] = group
@@ -86,7 +88,9 @@ def _expanded_job(source: dict[str, Any], model_name: str, seed: int, repeat: in
     job["stat_seed"] = seed
     job["stat_total_repeats"] = 10
     job["source_job_id"] = group
-    job["experiment_name"] = f"best_candidate_com_fundo_seed{seed}"
+    job["dataset_name"] = dataset
+    job["data_path"] = str(data_path)
+    job["experiment_name"] = f"best_candidate_{dataset}_seed{seed}"
     job["seed"] = seed
     return job
 
@@ -126,12 +130,12 @@ def _render(jobs: list[dict[str, Any]], source: Path) -> str:
 
 def main() -> int:
     args = _parse_args()
-    source_jobs = _source_jobs(args.source)
-    jobs = [
-        _expanded_job(source_jobs[model], model, seed, repeat)
-        for model in MODEL_ORDER
-        for repeat, seed in enumerate(NEW_SEEDS, start=len(EXISTING_SEEDS) + 1)
-    ]
+    dataset = args.dataset
+    data_path = args.data_path or Path("data") / dataset
+    source_jobs = _source_jobs(args.source, dataset)
+    jobs = [_expanded_job(source_jobs[model], model, seed, repeat, dataset, data_path)
+            for model in MODEL_ORDER
+            for repeat, seed in enumerate(NEW_SEEDS, start=len(EXISTING_SEEDS) + 1)]
     args.output.write_text(_render(jobs, args.source), encoding="utf-8")
     print(f"Gerados {len(jobs)} jobs em {args.output}")
     return 0

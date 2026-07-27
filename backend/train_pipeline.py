@@ -17,7 +17,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import time
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -404,14 +406,21 @@ def _print_job_header(index: int, total: int, job: dict[str, Any]) -> None:
 def _build_progress_callback(job: dict[str, Any]):
     last_batch_line = {"printed": False}
 
+    def safe_print(*args: Any, **kwargs: Any) -> None:
+        """Progress output must never abort a long-running training job."""
+        try:
+            print(*args, **kwargs)
+        except OSError:
+            pass
+
     def callback(message: dict[str, Any]) -> None:
         msg_type = message.get("type")
 
         if msg_type == "status":
             if last_batch_line["printed"]:
-                print()
+                safe_print()
                 last_batch_line["printed"] = False
-            print(f"[status] {message['message']}")
+            safe_print(f"[status] {message['message']}")
             return
 
         if msg_type == "batch_progress":
@@ -428,16 +437,19 @@ def _build_progress_callback(job: dict[str, Any]):
                 f"batch {batch}/{total_batches} | "
                 f"{progress:5.1f}% | loss={loss:.4f}"
             )
-            print(line, end="", flush=True)
-            last_batch_line["printed"] = True
+            if sys.stdout.isatty():
+                safe_print(line, end="", flush=True)
+                last_batch_line["printed"] = True
+            else:
+                safe_print(line.strip(), flush=True)
             return
 
         if last_batch_line["printed"]:
-            print()
+            safe_print()
             last_batch_line["printed"] = False
 
         if msg_type == "epoch_complete":
-            print(
+            safe_print(
                 f"[epoch] {message['epoch']}/{message['total_epochs']} | "
                 f"train_loss={message['train_loss']:.6f} | "
                 f"val_loss={message['val_loss']:.6f} | "
@@ -449,24 +461,24 @@ def _build_progress_callback(job: dict[str, Any]):
             return
 
         if msg_type == "training_complete":
-            print(
+            safe_print(
                 f"[done] accuracy={message['accuracy']:.2f}% | "
                 f"macro_f1={message.get('macro_f1', 0.0):.2f}% | "
                 f"best_{message.get('best_checkpoint_metric', 'val_loss')}="
                 f"{message.get('best_checkpoint_score', 0.0):.6f}"
             )
-            print(f"[model] {message['model_path']}")
+            safe_print(f"[model] {message['model_path']}")
             return
 
         if msg_type == "training_cancelled":
-            print("[cancelled] treinamento interrompido.")
+            safe_print("[cancelled] treinamento interrompido.")
             return
 
         if msg_type == "training_error":
-            print(f"[error] {message['message']}")
+            safe_print(f"[error] {message['message']}")
             return
 
-        print(f"[event] {message}")
+        safe_print(f"[event] {message}")
 
     return callback
 
@@ -798,10 +810,11 @@ def main() -> int:
             return 130
         except Exception as exc:
             failed_jobs += 1
-            report_path = _write_error_report(job, str(exc))
+            error_message = f"{exc}\n\nTRACEBACK:\n{traceback.format_exc()}"
+            report_path = _write_error_report(job, error_message)
             entry["status"] = ERROR_STATUS
             entry["finished_at"] = datetime.now().isoformat(timespec="seconds")
-            entry["error"] = str(exc)
+            entry["error"] = error_message
             entry["report_path"] = str(report_path)
             _write_run_state(run_state, run_file)
             print(f"[error] Job {index} falhou: {exc}")

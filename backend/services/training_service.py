@@ -11,6 +11,7 @@ import sys
 import time
 import threading
 import json
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
@@ -28,6 +29,7 @@ from torchvision.models import (
     EfficientNet_B2_Weights,
     EfficientNet_B3_Weights,
     EfficientNet_B7_Weights,
+    ConvNeXt_Tiny_Weights,
     ResNet50_Weights,
     MobileNet_V3_Large_Weights,
 )
@@ -35,6 +37,14 @@ from torchvision.models import (
 # ──────────────────────── Configuração de modelo ────────────────────────
 
 TRAINING_MODEL_CONFIGS = {
+    "ConvNeXtTiny": {
+        "builder": torchvision.models.convnext_tiny,
+        "weights": ConvNeXt_Tiny_Weights.IMAGENET1K_V1,
+        "input_size": 224,
+        "classifier_type": "sequential",
+        "default_batch": 16,
+        "cpu_batch": 4,
+    },
     "EfficientNetB0": {
         "builder": torchvision.models.efficientnet_b0,
         "weights": EfficientNet_B0_Weights.IMAGENET1K_V1,
@@ -749,7 +759,11 @@ class TrainingManager:
         try:
             self._train_loop(config, callback)
         except Exception as exc:
-            callback({"type": "training_error", "message": str(exc)})
+            callback({
+                "type": "training_error",
+                "message": str(exc),
+                "traceback": traceback.format_exc(),
+            })
         finally:
             with self._lock:
                 self.is_training = False
