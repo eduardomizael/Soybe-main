@@ -4,11 +4,11 @@
 id = "benchmark_agrupado_resnet50_seed42"
 enabled = true
 tags = ["bateria-final-eduardo", "benchmark_agrupado", "seed-42"]
-notes = "Repeticao estatistica 1/4 do grupo resnet50_com_fundo_best_candidate. Modelo: ResNet50; dataset: com_fundo; seed: 42. Mantem todos os parametros do job base resnet50_com_fundo_best_candidate, variando apenas a seed para calcular media, desvio padrao, intervalos de confianca e comparacoes pareadas. Nota do job base: ResNet50 com_fundo. Modelo disponivel nos pipelines, mas sem relatorio no round_1. Usa receita equivalente aos melhores jobs experimentais, com LR de fine tune reduzido e regularizacao moderada."
+notes = "Repetição estatística 1/10 da bateria final agrupada; experimento benchmark_agrupado; modelo ResNet50; dataset com_fundo; seed 42."
 stat_group = "resnet50_com_fundo_best_candidate"
 stat_repeat = 1
 stat_seed = 42
-stat_total_repeats = 4
+stat_total_repeats = 10
 source_job_id = "resnet50_com_fundo_best_candidate"
 dataset_name = "com_fundo"
 data_path = "data/com_fundo"

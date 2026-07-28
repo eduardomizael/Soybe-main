@@ -48,8 +48,11 @@ def main():
 
     def add(j, exp, recipe, index, **overrides):
         j.update(overrides)
+        repeat = SEEDS.index(int(j["seed"])) + 1
         j["id"] = f"{exp}_{j['model_name'].lower()}_seed{j['seed']}" + (f"_{index}" if index else "")
         j["experiment_name"], j["split_protocol"], j["recipe"] = exp, "grouped", recipe
+        j["stat_repeat"], j["stat_total_repeats"] = repeat, len(SEEDS)
+        j["notes"] = f"Repetição estatística {repeat}/{len(SEEDS)} da bateria final agrupada; experimento {exp}; modelo {j['model_name']}; dataset {j['dataset_name']}; seed {j['seed']}."
         j["tags"] = ["bateria-final-eduardo", exp, f"seed-{j['seed']}"]
         jobs.append(j)
 
