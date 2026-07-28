@@ -8,6 +8,12 @@ if ($Stage -eq "preflight") { & uv run --offline python backend/preflight_bateri
 if ($Stage -eq "piloto") { Write-Output "Executando somente o piloto exigido: ResNet50 / seed 42 / com_fundo." }
 $Config = Join-Path $Root $stagePath[$Stage]
 $Runs = Join-Path $Root "models/pipeline_runs"
+$previous = @{ bloco1="piloto"; bloco3="bloco1"; bloco4="bloco3"; bloco2="bloco4"; bloco5="bloco2" }
+if ($previous.ContainsKey($Stage)) {
+  $previousConfig = Join-Path $Root $stagePath[$previous[$Stage]]
+  $previousRun = Get-ChildItem $Runs -Filter "pipeline_run_*.json" | Sort-Object LastWriteTime -Descending | ForEach-Object { $j=Get-Content -Raw $_.FullName|ConvertFrom-Json; if ([IO.Path]::GetFullPath([string]$j.config_path) -eq [IO.Path]::GetFullPath($previousConfig)) { $j } } | Select-Object -First 1
+  if (-not $previousRun -or @($previousRun.jobs | Where-Object {$_.status -ne "success"}).Count -gt 0) { throw "A etapa anterior '$($previous[$Stage])' ainda não foi concluída com sucesso. Execute-a primeiro e aguarde a avaliação manual." }
+}
 $existing = $null
 if ($RunFile) { $existing = [IO.Path]::GetFullPath((Join-Path $Root $RunFile)) }
 if (-not $existing) {
