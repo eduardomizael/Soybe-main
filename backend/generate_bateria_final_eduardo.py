@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "backend" / "training_jobs_bateria_final_eduardo.toml"
+STAGE_DIR = ROOT / "backend" / "bateria_final_stages"
 MANIFEST = "docs/bateria_final_eduardo/splits_agrupados_10sementes.csv"
 SEEDS = (42, 1337, 2026, 9001, 7, 123, 2024, 31337, 777, 555)
 MODELS = ("EfficientNetB0", "EfficientNetB2", "EfficientNetB3", "MobileNetV3", "ResNet50", "ConvNeXtTiny")
@@ -70,7 +71,24 @@ def main():
         for key, value in job.items(): lines.append(f"{key} = {toml(value)}")
         lines.append("")
     OUT.write_text("\n".join(lines), encoding="utf-8")
+    STAGE_DIR.mkdir(exist_ok=True)
+    stage_jobs = {
+        "piloto": [j for j in jobs if j["experiment_name"] == "benchmark_agrupado" and j["model_name"] == "ResNet50" and j["seed"] == 42],
+        "bloco1": [j for j in jobs if j["experiment_name"] == "benchmark_agrupado"],
+        "bloco3": [j for j in jobs if j["experiment_name"] == "swin_t"],
+        "bloco4": [j for j in jobs if j["experiment_name"] == "uniforme"],
+        "bloco2": [j for j in jobs if j["experiment_name"] == "semfundo_agrupado"],
+        "bloco5": [j for j in jobs if j["experiment_name"].startswith("ablacao_")],
+    }
+    for stage, selected in stage_jobs.items():
+        stage_lines = [f"# {stage}: gerado pelo gerador da bateria final.", ""]
+        for job in selected:
+            stage_lines.append("[[jobs]]")
+            for key, value in job.items(): stage_lines.append(f"{key} = {toml(value)}")
+            stage_lines.append("")
+        (STAGE_DIR / f"{stage}.toml").write_text("\n".join(stage_lines), encoding="utf-8")
     print(f"Gerados {len(jobs)} jobs em {OUT}")
+    print("Estágios: " + ", ".join(f"{k}={len(v)}" for k, v in stage_jobs.items()))
 
 
 if __name__ == "__main__": main()
