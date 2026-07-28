@@ -184,8 +184,6 @@ def _resolve_model_config(model_name: str, config: dict) -> dict:
             )
         resolved["weights"] = options[requested_weights]
         resolved["pretrained_weights_name"] = requested_weights
-    elif cfg["classifier_type"] == "head":
-        model.head = nn.Linear(model.head.in_features, num_classes)
     else:
         resolved["pretrained_weights_name"] = resolved["weights"].name
 
@@ -210,9 +208,8 @@ def _build_model(
     if cfg["classifier_type"] == "fc":
         in_features = model.fc.in_features
         model.fc = nn.Linear(in_features, num_classes)
-    elif classifier_type == "head":
-        for param in model.head.parameters():
-            param.requires_grad = True
+    elif cfg["classifier_type"] == "head":
+        model.head = nn.Linear(model.head.in_features, num_classes)
     else:
         # EfficientNet / MobileNet — última Linear no Sequential
         for idx in range(len(model.classifier) - 1, -1, -1):
@@ -230,6 +227,9 @@ def _freeze_backbone(model: torch.nn.Module, classifier_type: str, freeze: bool)
 
     if classifier_type == "fc":
         for param in model.fc.parameters():
+            param.requires_grad = True
+    elif classifier_type == "head":
+        for param in model.head.parameters():
             param.requires_grad = True
     else:
         for param in model.classifier.parameters():
