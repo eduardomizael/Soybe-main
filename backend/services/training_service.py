@@ -12,6 +12,8 @@ import time
 import threading
 import json
 import traceback
+import csv
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
@@ -32,6 +34,7 @@ from torchvision.models import (
     ConvNeXt_Tiny_Weights,
     ResNet50_Weights,
     MobileNet_V3_Large_Weights,
+    Swin_T_Weights,
 )
 
 # ──────────────────────── Configuração de modelo ────────────────────────
@@ -40,6 +43,9 @@ TRAINING_MODEL_CONFIGS = {
     "ConvNeXtTiny": {
         "builder": torchvision.models.convnext_tiny,
         "weights": ConvNeXt_Tiny_Weights.IMAGENET1K_V1,
+        "weight_options": {
+            "IMAGENET1K_V1": ConvNeXt_Tiny_Weights.IMAGENET1K_V1,
+        },
         "input_size": 224,
         "classifier_type": "sequential",
         "default_batch": 16,
@@ -48,6 +54,7 @@ TRAINING_MODEL_CONFIGS = {
     "EfficientNetB0": {
         "builder": torchvision.models.efficientnet_b0,
         "weights": EfficientNet_B0_Weights.IMAGENET1K_V1,
+        "weight_options": {"IMAGENET1K_V1": EfficientNet_B0_Weights.IMAGENET1K_V1},
         "input_size": 224,
         "classifier_type": "sequential",  # model.classifier[1]
         "default_batch": 16,
@@ -56,6 +63,7 @@ TRAINING_MODEL_CONFIGS = {
     "EfficientNetB2": {
         "builder": torchvision.models.efficientnet_b2,
         "weights": EfficientNet_B2_Weights.IMAGENET1K_V1,
+        "weight_options": {"IMAGENET1K_V1": EfficientNet_B2_Weights.IMAGENET1K_V1},
         "input_size": 260,
         "classifier_type": "sequential",
         "default_batch": 16,
@@ -64,6 +72,7 @@ TRAINING_MODEL_CONFIGS = {
     "EfficientNetB3": {
         "builder": torchvision.models.efficientnet_b3,
         "weights": EfficientNet_B3_Weights.IMAGENET1K_V1,
+        "weight_options": {"IMAGENET1K_V1": EfficientNet_B3_Weights.IMAGENET1K_V1},
         "input_size": 300,
         "classifier_type": "sequential",
         "default_batch": 16,
@@ -72,6 +81,7 @@ TRAINING_MODEL_CONFIGS = {
     "EfficientNetB7": {
         "builder": torchvision.models.efficientnet_b7,
         "weights": EfficientNet_B7_Weights.IMAGENET1K_V1,
+        "weight_options": {"IMAGENET1K_V1": EfficientNet_B7_Weights.IMAGENET1K_V1},
         "input_size": 600,
         "classifier_type": "sequential",  # model.classifier[1]
         "default_batch": 8,
@@ -80,6 +90,10 @@ TRAINING_MODEL_CONFIGS = {
     "ResNet50": {
         "builder": torchvision.models.resnet50,
         "weights": ResNet50_Weights.IMAGENET1K_V2,
+        "weight_options": {
+            "IMAGENET1K_V1": ResNet50_Weights.IMAGENET1K_V1,
+            "IMAGENET1K_V2": ResNet50_Weights.IMAGENET1K_V2,
+        },
         "input_size": 224,
         "classifier_type": "fc",  # model.fc
         "default_batch": 16,
@@ -88,10 +102,23 @@ TRAINING_MODEL_CONFIGS = {
     "MobileNetV3": {
         "builder": torchvision.models.mobilenet_v3_large,
         "weights": MobileNet_V3_Large_Weights.IMAGENET1K_V2,
+        "weight_options": {
+            "IMAGENET1K_V1": MobileNet_V3_Large_Weights.IMAGENET1K_V1,
+            "IMAGENET1K_V2": MobileNet_V3_Large_Weights.IMAGENET1K_V2,
+        },
         "input_size": 224,
         "classifier_type": "sequential",  # model.classifier[-1]
         "default_batch": 32,
         "cpu_batch": 8,
+    },
+    "SwinT": {
+        "builder": torchvision.models.swin_t,
+        "weights": Swin_T_Weights.IMAGENET1K_V1,
+        "weight_options": {"IMAGENET1K_V1": Swin_T_Weights.IMAGENET1K_V1},
+        "input_size": 224,
+        "classifier_type": "head",
+        "default_batch": 16,
+        "cpu_batch": 4,
     },
 }
 
@@ -142,14 +169,50 @@ def _set_seed(seed: int):
         torch.cuda.manual_seed_all(seed)
 
 
-def _build_model(model_name: str, num_classes: int, device: torch.device):
+def _resolve_model_config(model_name: str, config: dict) -> dict:
+    """Aplica overrides explícitos do job sem alterar os defaults históricos."""
+    resolved = dict(TRAINING_MODEL_CONFIGS[model_name])
+    requested_weights = config.get("pretrained_weights")
+    if requested_weights is not None:
+        requested_weights = str(requested_weights)
+        options = resolved["weight_options"]
+        if requested_weights not in options:
+            available = ", ".join(options)
+            raise ValueError(
+                f"Pesos pré-treinados inválidos para {model_name}: "
+                f"{requested_weights}. Opções: {available}."
+            )
+        resolved["weights"] = options[requested_weights]
+        resolved["pretrained_weights_name"] = requested_weights
+    elif cfg["classifier_type"] == "head":
+        model.head = nn.Linear(model.head.in_features, num_classes)
+    else:
+        resolved["pretrained_weights_name"] = resolved["weights"].name
+
+    if "input_size" in config:
+        input_size = int(config["input_size"])
+        if input_size <= 0:
+            raise ValueError("input_size deve ser um inteiro positivo.")
+        resolved["input_size"] = input_size
+    return resolved
+
+
+def _build_model(
+    model_name: str,
+    num_classes: int,
+    device: torch.device,
+    model_config: dict | None = None,
+):
     """Constrói o modelo com pesos pré-treinados e ajusta a camada final."""
-    cfg = TRAINING_MODEL_CONFIGS[model_name]
+    cfg = model_config or TRAINING_MODEL_CONFIGS[model_name]
     model = cfg["builder"](weights=cfg["weights"])
 
     if cfg["classifier_type"] == "fc":
         in_features = model.fc.in_features
         model.fc = nn.Linear(in_features, num_classes)
+    elif classifier_type == "head":
+        for param in model.head.parameters():
+            param.requires_grad = True
     else:
         # EfficientNet / MobileNet — última Linear no Sequential
         for idx in range(len(model.classifier) - 1, -1, -1):
@@ -440,6 +503,34 @@ def _stratified_split(
         Subset(dataset, val_indices),
         Subset(dataset, test_indices),
     )
+
+
+def _grouped_split(dataset: ImageFolder, seed: int, manifest_path: str) -> tuple[Subset, Subset, Subset]:
+    """Aplica o manifesto por fotografia, mantendo todos os recortes juntos."""
+    assignments: dict[tuple[str, str], str] = {}
+    with Path(manifest_path).open(encoding="utf-8", newline="") as file:
+        for row in csv.DictReader(file):
+            if int(row["seed"]) == seed:
+                assignments[(row["classe"], row["dsc"])] = row["subset"]
+
+    subsets = {"train": [], "val": [], "test": []}
+    missing = 0
+    for index, (path, _) in enumerate(dataset.samples):
+        image_path = Path(path)
+        match = re.search(r"(DSC_\d+)", image_path.stem)
+        key = (image_path.parent.name.replace("_SF", ""), match.group(1)) if match else None
+        subset = assignments.get(key) if key else None
+        if subset in subsets:
+            subsets[subset].append(index)
+        else:
+            missing += 1
+    allowed_missing = sum(1 for path, _ in dataset.samples if re.search(r"DSC_032[0-3]", Path(path).stem))
+    unexpected = missing - allowed_missing
+    if unexpected:
+        raise ValueError(f"{unexpected} arquivo(s) fora do manifesto agrupado.")
+    if any(not subsets[name] for name in ("train", "val", "test")):
+        raise ValueError("Manifesto agrupado deixou algum subset vazio.")
+    return tuple(Subset(dataset, subsets[name]) for name in ("train", "val", "test"))
 
 
 def _macro_f1_score(labels: list[int], preds: list[int], num_classes: int) -> float:
@@ -798,9 +889,9 @@ class TrainingManager:
 
         if model_name not in TRAINING_MODEL_CONFIGS:
             raise ValueError(f"Modelo '{model_name}' não suportado.")
-        if split_strategy not in {"random", "stratified", "predefined"}:
+        if split_strategy not in {"random", "stratified", "grouped", "predefined"}:
             raise ValueError(
-                "split_strategy deve ser 'random', 'stratified' ou 'predefined'. "
+                "split_strategy deve ser 'random', 'stratified', 'grouped' ou 'predefined'. "
                 f"Recebido: {split_strategy}"
             )
         if checkpoint_metric not in {"val_loss", "val_accuracy", "val_macro_f1"}:
@@ -844,7 +935,7 @@ class TrainingManager:
                 f"Recebido: {augmentation_profile}"
             )
 
-        cfg = TRAINING_MODEL_CONFIGS[model_name]
+        cfg = _resolve_model_config(model_name, config)
         batch_size = int(
             configured_batch_size
             if configured_batch_size is not None
@@ -895,7 +986,13 @@ class TrainingManager:
                     f"Dataset muito pequeno ({total} imagens) para os splits configurados."
                 )
 
-        if split_strategy == "stratified":
+        if split_strategy == "grouped":
+            manifest_path = config.get("split_manifest")
+            if not manifest_path:
+                raise ValueError("split_manifest é obrigatório para split_strategy='grouped'.")
+            train_ds_raw, val_ds_raw, test_ds_raw = _grouped_split(dataset, seed, manifest_path)
+            train_size, val_size, test_size = len(train_ds_raw), len(val_ds_raw), len(test_ds_raw)
+        elif split_strategy == "stratified":
             train_ds_raw, val_ds_raw, test_ds_raw = _stratified_split(
                 dataset,
                 num_classes,
@@ -985,7 +1082,7 @@ class TrainingManager:
         })
 
         # ── Model ──
-        model = _build_model(model_name, num_classes, device)
+        model = _build_model(model_name, num_classes, device, cfg)
         if freeze_backbone_epochs > 0:
             _freeze_backbone(model, cfg["classifier_type"], freeze=True)
         criterion = _build_criterion(
@@ -1027,6 +1124,7 @@ class TrainingManager:
         save_path = os.path.join(
             MODELS_SAVE_DIR, f"{model_file_prefix}_{timestamp_str}.pth"
         )
+        predictions_path = os.path.splitext(save_path)[0] + "_predictions.csv"
 
         has_saved_checkpoint = False
 
@@ -1248,6 +1346,13 @@ class TrainingManager:
                 all_probs.extend(probs.cpu().numpy())
         eval_time = time.time() - eval_started_at
 
+        with open(predictions_path, "w", newline="", encoding="utf-8") as file:
+            writer = csv.writer(file)
+            writer.writerow(["caminho_arquivo", "classe_verdadeira", "classe_predita"])
+            for sample_index, (label, pred) in enumerate(zip(all_labels, all_preds)):
+                path = test_ds_raw.dataset.samples[test_ds_raw.indices[sample_index]][0] if isinstance(test_ds_raw, Subset) else test_ds_raw.samples[sample_index][0]
+                writer.writerow([path, class_names[int(label)], class_names[int(pred)]])
+
         # Classification report
         report = classification_report(
             all_labels, all_preds,
@@ -1326,6 +1431,7 @@ class TrainingManager:
             "macro_f1": round(macro_f1 * 100, 2),
             "classification_report": per_class,
             "model_path": save_path,
+            "predictions_path": predictions_path,
             "num_classes": num_classes,
             "class_names": class_names,
             "confusion_matrix": cm.tolist(),
@@ -1358,6 +1464,7 @@ class TrainingManager:
                 "freeze_backbone_epochs": freeze_backbone_epochs,
                 "fine_tune_learning_rate": fine_tune_learning_rate,
                 "input_size": cfg["input_size"],
+                "pretrained_weights": cfg["pretrained_weights_name"],
             },
             "efficiency": {
                 "train_images_seen": train_images_seen,

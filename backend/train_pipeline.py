@@ -53,6 +53,8 @@ REPORT_FRONT_MATTER_KEYS = [
     "data_path",
     "model_name",
     "experiment_name",
+    "pretrained_weights",
+    "input_size",
 ]
 
 
@@ -300,6 +302,19 @@ def _validate_job(job: dict[str, Any]) -> dict[str, Any]:
         models = ", ".join(TRAINING_MODEL_CONFIGS)
         raise ValueError(f"Modelo inválido: '{model_name}'. Opções: {models}")
 
+    requested_weights = job.get("pretrained_weights")
+    if requested_weights is not None:
+        supported_weights = TRAINING_MODEL_CONFIGS[model_name]["weight_options"]
+        if str(requested_weights) not in supported_weights:
+            options = ", ".join(supported_weights)
+            raise ValueError(
+                f"pretrained_weights inválido para '{model_name}': "
+                f"{requested_weights}. Opções: {options}."
+            )
+
+    if "input_size" in job and int(job["input_size"]) <= 0:
+        raise ValueError(f"input_size inválido para '{model_name}': {job['input_size']}.")
+
     configured_data_path = Path(str(job["data_path"]))
     if not configured_data_path.is_absolute():
         configured_data_path = Path(WORKSPACE_ROOT) / configured_data_path
@@ -312,7 +327,7 @@ def _validate_job(job: dict[str, Any]) -> dict[str, Any]:
     if not data_path.is_dir():
         raise ValueError(f"Dataset não encontrado: '{data_path}'.")
 
-    if split_strategy not in {"random", "stratified", "predefined"}:
+    if split_strategy not in {"random", "stratified", "grouped", "predefined"}:
         raise ValueError(
             f"split_strategy inválido para '{model_name}': {split_strategy}."
         )
@@ -747,6 +762,7 @@ def main() -> int:
                 entry["status"] = COMPLETED_STATUS
                 entry["finished_at"] = datetime.now().isoformat(timespec="seconds")
                 entry["model_path"] = result.get("model_path", "")
+                entry["predictions_path"] = result.get("predictions_path", "")
                 entry["report_path"] = str(report_path)
                 entry["result"] = {
                     "accuracy": result.get("accuracy", 0.0),
@@ -778,6 +794,7 @@ def main() -> int:
                     ),
                     "model_size_mb": result.get("efficiency", {}).get("model_size_mb", 0.0),
                     "model_path": result.get("model_path", ""),
+                    "predictions_path": result.get("predictions_path", ""),
                     "report_path": str(report_path),
                 })
             else:
