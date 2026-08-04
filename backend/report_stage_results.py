@@ -11,6 +11,7 @@ def main():
     jobs = [e for e in run.get("jobs", []) if e.get("status") == "success"]
     if not jobs: raise SystemExit("Nenhum job concluído.")
     stage = Path(run["config_path"]).stem
+    next_stage = {"bloco3": "Bloco 4", "bloco4": "Bloco 2", "bloco2": "Bloco 5", "bloco5": "análise final"}.get(stage, "próxima etapa")
     stamp = run.get("run_id", "sem_id")
     analysis = ROOT / "models" / f"{stage}_analysis_{stamp}"
     package = ROOT / "models" / f"{stage}_package_{stamp}"
@@ -32,12 +33,12 @@ def main():
         w=csv.DictWriter(f,fieldnames=list(grouped[0])); w.writeheader(); w.writerows(grouped)
     lines=[f"# Relatório consolidado — {stage}","",f"Execuções válidas: {len(rows)}","", "| Arquitetura | n | Accuracy média | Accuracy DP | Macro-F1 média | Macro-F1 DP | Tempo médio (min) |","|---|---:|---:|---:|---:|---:|---:|"]
     for g in grouped: lines.append(f"| {g['arquitetura']} | {g['n']} | {g['accuracy_media']:.2f}% | {g['accuracy_dp']:.2f} | {g['macro_f1_media']:.2f}% | {g['macro_f1_dp']:.2f} | {g['tempo_medio_min']:.2f} |")
-    lines += ["","Todos os jobs concluídos possuem checkpoint, relatório TXT e CSV de predições no pacote.","","Próxima etapa conforme o leia_primeiro: Bloco 4, após revisão/aceite desta etapa.",""]
+    lines += ["","Todos os jobs concluídos possuem checkpoint, relatório TXT e CSV de predições no pacote.","",f"Próxima etapa conforme o leia_primeiro: {next_stage}, após revisão/aceite desta etapa.",""]
     (analysis/"relatorio_consolidado.md").write_text("\n".join(lines),encoding="utf-8")
     shutil.copy2(run_path, package/"source"/run_path.name)
     config=Path(run["config_path"])
     if config.exists(): shutil.copy2(config,package/"source"/config.name)
-    (package/"README_ENVIO.md").write_text(f"# Pacote {stage}\n\n{len(rows)} execuções concluídas. Consulte `analysis/relatorio_consolidado.md`. Checkpoints, relatórios e predições estão separados por diretório.\n",encoding="utf-8")
+    (package/"README_ENVIO.md").write_text(f"# Pacote {stage}\n\n{len(rows)} execuções concluídas. Consulte `analysis/relatorio_consolidado.md`. Checkpoints, relatórios e predições estão separados por diretório.\n\nPróxima etapa: {next_stage}.\n",encoding="utf-8")
     print(f"Análise: {analysis}\nPacote: {package}")
 
 if __name__ == "__main__": main()
