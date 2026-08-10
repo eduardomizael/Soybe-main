@@ -339,6 +339,56 @@ class PredefinedClassFirstDataset(torch.utils.data.Dataset):
             )
 
 
+class ManifestDataset(torch.utils.data.Dataset):
+    """Dataset imutável descrito por CSV com caminho_arquivo, classe e subset."""
+
+    def __init__(self, rows: list[tuple[str, str]], classes: list[str]):
+        self.classes = classes
+        self.class_to_idx = {name: idx for idx, name in enumerate(classes)}
+        self.samples = [(path, self.class_to_idx[class_name]) for path, class_name in rows]
+        self.targets = [target for _, target in self.samples]
+        if not self.samples:
+            raise ValueError("Manifesto não contém imagens.")
+
+    def __getitem__(self, index):
+        path, target = self.samples[index]
+        return default_loader(path), target
+
+    def __len__(self):
+        return len(self.samples)
+
+
+def _load_manifest_split(manifest_path: str):
+    path = Path(manifest_path)
+    if not path.is_file():
+        raise ValueError(f"Manifesto não encontrado: {path}")
+    grouped: dict[str, list[tuple[str, str]]] = {"train": [], "val": [], "test": []}
+    classes: set[str] = set()
+    with path.open(encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        required = {"caminho_arquivo", "classe", "subset"}
+        if not required.issubset(reader.fieldnames or set()):
+            raise ValueError("Manifesto deve conter caminho_arquivo, classe e subset.")
+        for row in reader:
+            subset = str(row["subset"]).strip().lower()
+            if subset not in grouped:
+                raise ValueError(f"Subset inválido no manifesto: {subset}")
+            image = Path(row["caminho_arquivo"]).resolve()
+            if not image.is_file() or not has_file_allowed_extension(str(image), IMG_EXTENSIONS):
+                raise ValueError(f"Imagem do manifesto não encontrada: {image}")
+            class_name = str(row["classe"]).strip()
+            classes.add(class_name)
+            grouped[subset].append((str(image), class_name))
+    class_names = sorted(classes)
+    datasets = {
+        subset: ManifestDataset(rows, class_names)
+        for subset, rows in grouped.items()
+    }
+    if any(not grouped[name] for name in grouped):
+        raise ValueError("Manifesto deve conter train, val e test.")
+    return datasets["train"], datasets["val"], datasets["test"], class_names
+
+
 def _find_alias_dir(parent: Path, aliases: tuple[str, ...]) -> Path | None:
     alias_lookup = {alias.lower(): alias for alias in aliases}
     for child in parent.iterdir():
@@ -879,6 +929,9 @@ class TrainingManager:
         train_split = config.get("train_split", 0.8)
         val_split = config.get("val_split", 0.1)
         seed = int(config.get("seed", 42))
+        # Permite separar a aleatoriedade do treinamento da partição fixa.
+        # Quando ausente, preserva o comportamento histórico.
+        partition_seed = int(config.get("partition_seed", seed))
         use_seed = bool(config.get("use_seed", True))
         accumulation_steps = max(1, int(config.get("accumulation_steps", 1)))
         freeze_backbone_epochs = max(0, int(config.get("freeze_backbone_epochs", 0)))
@@ -962,7 +1015,16 @@ class TrainingManager:
 
         # ── Dataset ──
         # Carrega as imagens puras (sem transformações globais prejudiciais pra Val)
-        if split_strategy == "predefined":
+        if split_strategy == "predefined" and config.get("split_manifest"):
+            train_ds_raw, val_ds_raw, test_ds_raw, class_names = _load_manifest_split(
+                config["split_manifest"]
+            )
+            num_classes = len(class_names)
+            train_size, val_size, test_size = (
+                len(train_ds_raw), len(val_ds_raw), len(test_ds_raw)
+            )
+            total = train_size + val_size + test_size
+        elif split_strategy == "predefined":
             train_ds_raw, val_ds_raw, test_ds_raw, class_names = _load_predefined_split(
                 data_path
             )
@@ -990,7 +1052,7 @@ class TrainingManager:
             manifest_path = config.get("split_manifest")
             if not manifest_path:
                 raise ValueError("split_manifest é obrigatório para split_strategy='grouped'.")
-            train_ds_raw, val_ds_raw, test_ds_raw = _grouped_split(dataset, seed, manifest_path)
+            train_ds_raw, val_ds_raw, test_ds_raw = _grouped_split(dataset, partition_seed, manifest_path)
             train_size, val_size, test_size = len(train_ds_raw), len(val_ds_raw), len(test_ds_raw)
         elif split_strategy == "stratified":
             train_ds_raw, val_ds_raw, test_ds_raw = _stratified_split(
@@ -1459,6 +1521,7 @@ class TrainingManager:
                 "augmentation_profile": augmentation_profile,
                 "seed": seed,
                 "use_seed": use_seed,
+                "partition_seed": partition_seed,
                 "accumulation_steps": accumulation_steps,
                 "effective_batch_size": batch_size * accumulation_steps,
                 "freeze_backbone_epochs": freeze_backbone_epochs,
