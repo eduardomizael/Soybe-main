@@ -186,11 +186,8 @@ venv/
 ENV/
 .venv
 
-data/
+data/*
 Dataset_grider/
 
 docs/
 scripts/
-
-# Artefatos gerados das baterias novas
-manifestos_bloco8/
