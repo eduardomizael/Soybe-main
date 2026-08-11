@@ -24,8 +24,7 @@ $Stages = @(
     @{ Name = "bloco3"; Config = (Join-Path $StageDir "bloco3.toml") },
     @{ Name = "bloco4"; Config = (Join-Path $StageDir "bloco4.toml") },
     @{ Name = "bloco2"; Config = (Join-Path $StageDir "bloco2.toml") },
-    @{ Name = "bloco5"; Config = (Join-Path $StageDir "bloco5.toml") },
-    @{ Name = "bloco12_convnext_random"; Config = (Join-Path $StageDir "bloco12_convnext_random.toml") }
+    @{ Name = "bloco5"; Config = (Join-Path $StageDir "bloco5.toml") }
 )
 
 function Get-RunState($Path) {

@@ -11,6 +11,8 @@ $StageDir = Join-Path $Root "backend\novas_baterias_stages"
 Write-Host "[preparação] Gerando jobs das novas baterias..." -ForegroundColor Cyan
 & uv run --offline python backend/generate_novas_baterias_rgb.py
 if ($LASTEXITCODE -ne 0) { throw "Falha ao gerar os jobs." }
+& uv run --offline python backend/generate_bloco12_convnext_random.py
+if ($LASTEXITCODE -ne 0) { throw "Falha ao gerar os jobs do Bloco 12." }
 
 function Get-LatestRun([string]$ConfigPath) {
     $wanted = [IO.Path]::GetFullPath($ConfigPath)
@@ -36,8 +38,12 @@ function Assert-Complete([string]$RunFile, [string]$Name) {
     }
 }
 
-foreach ($stage in @("bloco8", "bloco9", "bloco11")) {
-    $config = Join-Path $StageDir "$stage.toml"
+foreach ($stage in @("bloco8", "bloco9", "bloco11", "bloco12_convnext_random")) {
+    $config = if ($stage -eq "bloco12_convnext_random") {
+        Join-Path $Root "backend\bateria_final_stages\bloco12_convnext_random.toml"
+    } else {
+        Join-Path $StageDir "$stage.toml"
+    }
     $run = Get-LatestRun $config
     if ($run) {
         Write-Host "[$stage] Retomando $run" -ForegroundColor Yellow
