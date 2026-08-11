@@ -31,7 +31,7 @@ def main() -> None:
         job.update(
             id=f"convnexttiny_com_fundo_random_seed{seed}",
             experiment_name="random_convnext_perclasse",
-            split_strategy="random",
+            split_strategy="stratified",
             split_manifest=None,
             notes=(
                 f"Bloco 12: ConvNeXt-Tiny RGB com_fundo, protocolo aleatório, "
