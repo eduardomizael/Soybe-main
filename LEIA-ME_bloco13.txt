@@ -1,0 +1,29 @@
+BLOCO 13 - braco aleatorio limpo (48.039). Pacote pronto: nada a criar, so executar.
+
+ONDE COLOCAR OS ARQUIVOS (raiz do Soybe-main):
+  preparar_arvore_bloco13.py  ->  raiz
+  bloco13_prevoo.toml         ->  backend/bateria_final_stages/
+  bloco13.toml                ->  backend/bateria_final_stages/
+
+TRES COMANDOS, NESTA ORDEM:
+
+1) uv run python preparar_arvore_bloco13.py
+   Cria data/com_fundo_filtrado e valida as 8 classes contra a Tabela 2.
+   Se imprimir ERRO, parar e mandar a saida para o Leonardo.
+
+2) uv run python -m backend.train_pipeline --config backend/bateria_final_stages/bloco13_prevoo.toml
+   Pre-voo: 1 job (MobileNetV3 seed 42, ~1 h). MANDAR O REPORT para o Leonardo
+   conferir (train+val+test tem que somar 48039; test ~4804 - se aparecer 4897,
+   a arvore esta errada). So seguir apos o OK.
+
+3) uv run python -m backend.train_pipeline --config backend/bateria_final_stages/bloco13.toml
+   Bateria completa: 60 jobs (~3 dias). O job do pre-voo ja executado nao repete
+   se o pipeline retomar pelo run-file; se rodar do zero, ele treina de novo -
+   sem problema, so custa 1 h a mais.
+
+ENTREGAR em resultados_agrupados/13_aleatorio_limpo/:
+  metricas.csv + predicoes/ POR EXECUCAO (obrigatorio desta vez) + reports/ + source/
+
+O QUE E ESTE BLOCO: os mesmos 60 jobs do braco aleatorio original (mesmos TOMLs
+de origem, receitas conferidas 60/60 contra a Tabela 4), com UMA mudanca:
+data_path = data/com_fundo_filtrado. Nada mais foi tocado.

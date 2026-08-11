@@ -1,0 +1,47 @@
+# Bloco 13 - braco aleatorio LIMPO: mesmas 60 configuracoes do braco aleatorio
+# original (estatistic_analisis + convnext_10_seeds + seed_expansion_10), com UMA
+# unica mudanca: data_path aponta para data/com_fundo_filtrado (48.039 instancias,
+# sem DSC_0320-0323). Nada mais foi alterado. Gerado automaticamente a partir dos
+# TOMLs originais; receitas validadas contra a Tabela 4 do artigo.
+#
+# Pre-voo (1 job):  uv run python -m backend.train_pipeline --config backend/bateria_final_stages/bloco13_prevoo.toml
+# Bateria completa: uv run python -m backend.train_pipeline --config backend/bateria_final_stages/bloco13.toml
+
+[[jobs]]
+id = "bloco13_mobilenetv3_com_fundo_best_candidate_seed42"
+enabled = true
+tags = ["best-candidate", "com_fundo", "mobilenet", "macro-f1", "stratified", "weighted", "statistical-repeat", "seed-42", "repeat-01", "bloco13-aleatorio-limpo"]
+notes = "Repeticao estatistica 1/4 do grupo mobilenetv3_com_fundo_best_candidate. Modelo: MobileNetV3; dataset: com_fundo; seed: 42. Mantem todos os parametros do job base mobilenetv3_com_fundo_best_candidate, variando apenas a seed para calcular media, desvio padrao, intervalos de confianca e comparacoes pareadas. Nota do job base: MobileNetV3 com_fundo. Baseado no melhor MobileNetV3 do round_1: experimental com_fundo, macro F1 92.19%, accuracy 96.24%. Mantem a receita experimental e amplia para 30 epocas com early stopping por macro F1."
+stat_group = "bloco13_mobilenetv3_com_fundo_best_candidate"
+stat_repeat = 1
+stat_seed = 42
+stat_total_repeats = 4
+source_job_id = "mobilenetv3_com_fundo_best_candidate"
+dataset_name = "com_fundo"
+data_path = "data/com_fundo_filtrado"
+model_name = "MobileNetV3"
+experiment_name = "bloco13_best_candidate_com_fundo_seed42"
+batch_size = 32
+num_epochs = 30
+learning_rate = 0.00012
+fine_tune_learning_rate = 8e-05
+early_stopping = true
+split_strategy = "stratified"
+checkpoint_metric = "val_macro_f1"
+sampler_strategy = "weighted"
+loss_name = "cross_entropy"
+class_weight_strategy = "sqrt_inverse"
+label_smoothing = 0
+focal_gamma = 1.5
+augmentation_profile = "standard"
+patience = 7
+train_split = 0.8
+val_split = 0.1
+seed = 42
+optimizer_name = "AdamW"
+weight_decay = 0.00015
+scheduler_factor = 0.5
+scheduler_patience = 3
+scheduler_min_lr = 1e-06
+accumulation_steps = 1
+freeze_backbone_epochs = 2
