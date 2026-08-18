@@ -1,0 +1,147 @@
+RELATORIO DE TREINAMENTO
+========================================================================
+Gerado em: 2026-08-17T14:25:43
+Modelo: EfficientNetB2
+Experimento: bloco13_best_candidate_com_fundo_seed123
+Dataset nome: com_fundo
+Dataset: C:\Users\eduar\Desktop\Soybe-main\data\com_fundo_filtrado
+Arquivo de pesos: C:\Users\eduar\Desktop\Soybe-main\models\soybean_model_efficientnetb2_com_fundo_bloco13_best_candidate_com_fundo_seed123_20260817_125849.pth
+
+CONFIGURACAO
+------------------------------------------------------------------------
+id: bloco13_efficientnetb2_com_fundo_best_candidate_seed123
+enabled: True
+tags: best-candidate, com_fundo, efficientnet, efficientnetb2, macro-f1, stratified, weighted, statistical-repeat, rgb-seed-expansion-10, remaining-models, seed-123, repeat-06, bloco13-aleatorio-limpo
+notes: Expansao RGB para 10 seeds, repeticao 6/10. Replica a receita experimental validada de EfficientNetB2 em com_fundo; somente a seed muda para 123.
+dataset_name: com_fundo
+data_path: C:\Users\eduar\Desktop\Soybe-main\data\com_fundo_filtrado
+model_name: EfficientNetB2
+experiment_name: bloco13_best_candidate_com_fundo_seed123
+accumulation_steps: 1
+augmentation_profile: standard
+batch_size: 12
+checkpoint_metric: val_macro_f1
+class_weight_strategy: sqrt_inverse
+early_stopping: True
+fine_tune_learning_rate: 6e-05
+focal_gamma: 1.5
+freeze_backbone_epochs: 2
+label_smoothing: 0
+learning_rate: 0.0001
+loss_name: cross_entropy
+num_epochs: 30
+optimizer_name: AdamW
+patience: 7
+sampler_strategy: weighted
+scheduler_factor: 0.5
+scheduler_min_lr: 1e-06
+scheduler_patience: 3
+seed: 123
+source_job_id: efficientnetb2_com_fundo_best_candidate
+split_strategy: stratified
+stat_group: bloco13_efficientnetb2_com_fundo_best_candidate
+stat_repeat: 6
+stat_seed: 123
+stat_total_repeats: 10
+train_split: 0.8
+val_split: 0.1
+weight_decay: 0.00015
+
+RESULTADO FINAL
+------------------------------------------------------------------------
+accuracy: 97.58%
+macro_f1: 92.37%
+best_val_loss: 0.113131
+best_checkpoint_metric: val_macro_f1
+best_checkpoint_score: 0.939537
+best_epoch: 13
+total_time: 5214.0s
+num_classes: 8
+class_names: RGB_JPG_CHOCHOS, RGB_JPG_ESVERDEADO, RGB_JPG_IMPUREZAS, RGB_JPG_INSETOS, RGB_JPG_MAMONAS, RGB_JPG_Normais, RGB_JPG_PURPURAS, RGB_JPG_QUEBRADOS
+
+RUNTIME
+------------------------------------------------------------------------
+dataset_name: com_fundo
+device: cuda
+num_workers: 0
+pin_memory: True
+mixed_precision: True
+optimizer: AdamW
+scheduler: ReduceLROnPlateau
+split_strategy: stratified
+checkpoint_metric: val_macro_f1
+sampler_strategy: weighted
+loss_name: cross_entropy
+class_weight_strategy: sqrt_inverse
+label_smoothing: 0.0
+focal_gamma: 1.5
+augmentation_profile: standard
+input_size: 260
+effective_batch_size: 12
+
+EFICIENCIA
+------------------------------------------------------------------------
+train_images_seen: 768640
+train_images_per_second: 147.4190
+test_images: 4803
+test_eval_seconds: 13.0888
+test_images_per_second: 366.9546
+parameter_count: 7712266
+trainable_parameter_count: 7712266
+model_size_mb: 29.9277
+
+METRICAS POR CLASSE
+------------------------------------------------------------------------
+RGB_JPG_CHOCHOS: precision=95.20% | recall=96.16% | f1=95.68% | support=495
+RGB_JPG_ESVERDEADO: precision=81.75% | recall=86.55% | f1=84.08% | support=119
+RGB_JPG_IMPUREZAS: precision=99.58% | recall=100.00% | f1=99.79% | support=1435
+RGB_JPG_INSETOS: precision=63.64% | recall=87.50% | f1=73.68% | support=24
+RGB_JPG_MAMONAS: precision=100.00% | recall=100.00% | f1=100.00% | support=55
+RGB_JPG_Normais: precision=98.62% | recall=97.88% | f1=98.25% | support=1977
+RGB_JPG_PURPURAS: precision=88.37% | recall=95.00% | f1=91.57% | support=40
+RGB_JPG_QUEBRADOS: precision=97.05% | recall=94.83% | f1=95.93% | support=658
+
+MATRIZ DE CONFUSAO
+------------------------------------------------------------------------
+476 9 2 0 0 3 2 3
+12 103 1 0 0 2 1 0
+0 0 1435 0 0 0 0 0
+0 0 0 21 0 2 1 0
+0 0 0 0 55 0 0 0
+7 7 0 11 0 1935 1 16
+1 0 0 1 0 0 38 0
+4 7 3 0 0 20 0 624
+
+ROC AUC POR CLASSE
+------------------------------------------------------------------------
+RGB_JPG_CHOCHOS: auc=0.9984
+RGB_JPG_ESVERDEADO: auc=0.9950
+RGB_JPG_IMPUREZAS: auc=1.0000
+RGB_JPG_INSETOS: auc=0.9990
+RGB_JPG_MAMONAS: auc=1.0000
+RGB_JPG_Normais: auc=0.9987
+RGB_JPG_PURPURAS: auc=0.9996
+RGB_JPG_QUEBRADOS: auc=0.9979
+
+HISTORICO POR EPOCA
+------------------------------------------------------------------------
+epoch=1 | phase=head | train_loss=1.173673 | val_loss=0.945804 | val_accuracy=74.5212% | val_macro_f1=58.2960% | checkpoint_score=0.582960 | lr=0.00010000 | elapsed=198.7s
+epoch=2 | phase=head | train_loss=0.798231 | val_loss=0.765185 | val_accuracy=78.3097% | val_macro_f1=63.2730% | checkpoint_score=0.632730 | lr=0.00010000 | elapsed=395.3s
+epoch=3 | phase=full | train_loss=0.365297 | val_loss=0.173749 | val_accuracy=95.2123% | val_macro_f1=89.9225% | checkpoint_score=0.899225 | lr=0.00006000 | elapsed=666.9s
+epoch=4 | phase=full | train_loss=0.214775 | val_loss=0.157249 | val_accuracy=94.9209% | val_macro_f1=86.5519% | checkpoint_score=0.865519 | lr=0.00006000 | elapsed=933.7s
+epoch=5 | phase=full | train_loss=0.165871 | val_loss=0.154035 | val_accuracy=94.4629% | val_macro_f1=88.8445% | checkpoint_score=0.888445 | lr=0.00006000 | elapsed=1200.5s
+epoch=6 | phase=full | train_loss=0.138609 | val_loss=0.131164 | val_accuracy=96.2115% | val_macro_f1=89.4293% | checkpoint_score=0.894293 | lr=0.00006000 | elapsed=1472.6s
+epoch=7 | phase=full | train_loss=0.112058 | val_loss=0.127412 | val_accuracy=96.3364% | val_macro_f1=92.0599% | checkpoint_score=0.920599 | lr=0.00006000 | elapsed=1748.5s
+epoch=8 | phase=full | train_loss=0.090902 | val_loss=0.178877 | val_accuracy=94.0883% | val_macro_f1=88.5622% | checkpoint_score=0.885622 | lr=0.00006000 | elapsed=2020.3s
+epoch=9 | phase=full | train_loss=0.078015 | val_loss=0.166851 | val_accuracy=94.9833% | val_macro_f1=88.5863% | checkpoint_score=0.885863 | lr=0.00006000 | elapsed=2287.4s
+epoch=10 | phase=full | train_loss=0.071345 | val_loss=0.147689 | val_accuracy=96.2739% | val_macro_f1=92.0780% | checkpoint_score=0.920780 | lr=0.00006000 | elapsed=2554.4s
+epoch=11 | phase=full | train_loss=0.060354 | val_loss=0.125411 | val_accuracy=97.0233% | val_macro_f1=92.4702% | checkpoint_score=0.924702 | lr=0.00006000 | elapsed=2820.7s
+epoch=12 | phase=full | train_loss=0.057580 | val_loss=0.142959 | val_accuracy=96.7527% | val_macro_f1=92.9954% | checkpoint_score=0.929954 | lr=0.00006000 | elapsed=3084.8s
+epoch=13 | phase=full | train_loss=0.052557 | val_loss=0.117660 | val_accuracy=97.1690% | val_macro_f1=93.9537% | checkpoint_score=0.939537 | lr=0.00006000 | elapsed=3348.5s
+epoch=14 | phase=full | train_loss=0.046439 | val_loss=0.126774 | val_accuracy=96.5237% | val_macro_f1=91.7451% | checkpoint_score=0.917451 | lr=0.00006000 | elapsed=3612.3s
+epoch=15 | phase=full | train_loss=0.047620 | val_loss=0.176500 | val_accuracy=95.3997% | val_macro_f1=90.9603% | checkpoint_score=0.909603 | lr=0.00006000 | elapsed=3876.6s
+epoch=16 | phase=full | train_loss=0.041571 | val_loss=0.150897 | val_accuracy=96.1699% | val_macro_f1=88.2934% | checkpoint_score=0.882934 | lr=0.00006000 | elapsed=4142.7s
+epoch=17 | phase=full | train_loss=0.035605 | val_loss=0.113131 | val_accuracy=97.2731% | val_macro_f1=93.5617% | checkpoint_score=0.935617 | lr=0.00006000 | elapsed=4409.0s
+epoch=18 | phase=full | train_loss=0.031115 | val_loss=0.136672 | val_accuracy=96.8984% | val_macro_f1=93.4463% | checkpoint_score=0.934463 | lr=0.00006000 | elapsed=4674.1s
+epoch=19 | phase=full | train_loss=0.036361 | val_loss=0.155411 | val_accuracy=97.3772% | val_macro_f1=93.3330% | checkpoint_score=0.933330 | lr=0.00006000 | elapsed=4937.6s
+epoch=20 | phase=full | train_loss=0.031331 | val_loss=0.138723 | val_accuracy=97.2731% | val_macro_f1=93.6253% | checkpoint_score=0.936253 | lr=0.00006000 | elapsed=5200.8s

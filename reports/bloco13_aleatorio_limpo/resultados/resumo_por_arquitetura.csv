@@ -1,0 +1,7 @@
+﻿arquitetura,n,accuracy_media,accuracy_dp,macro_f1_media,macro_f1_dp,tempo_medio_min
+ConvNeXtTiny,10,98.29,0.167,94.412,0.961,98.81
+EfficientNetB0,10,97.449,0.312,93.18,1.142,80.2
+EfficientNetB2,10,97.537,0.188,93.225,0.481,114.11
+EfficientNetB3,10,97.262,0.449,92.349,0.997,175.2
+MobileNetV3,10,97.655,0.263,93.533,0.67,62.41
+ResNet50,10,97.911,0.239,94.204,0.678,91.17
