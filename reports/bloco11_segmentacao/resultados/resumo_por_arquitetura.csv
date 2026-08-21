@@ -1,0 +1,3 @@
+﻿arquitetura,n,accuracy_media,accuracy_dp,macro_f1_media,macro_f1_dp,tempo_medio_min
+EfficientNetB2,10,94.964,1.254,88.006,2.298,72.93
+EfficientNetB3,10,94.17,1.714,86.774,2.898,114.48
