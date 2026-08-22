@@ -1,0 +1,2 @@
+﻿arquitetura,n,accuracy_media,accuracy_dp,macro_f1_media,macro_f1_dp,tempo_medio_min
+ConvNeXtTiny,10,96.71,0.18,93.511,0.565,97.62

@@ -1,0 +1,11 @@
+﻿experimento,arquitetura,conjunto,semente,split_protocol,receita,acuracia,macro_f1,tempo_treino_min,job_id
+random_convnext_perclasse,ConvNeXtTiny,com_fundo,42,,,96.71,93.43,117.65,convnexttiny_com_fundo_random_seed42
+random_convnext_perclasse,ConvNeXtTiny,com_fundo,1337,,,96.47,92.75,66.37,convnexttiny_com_fundo_random_seed1337
+random_convnext_perclasse,ConvNeXtTiny,com_fundo,2026,,,96.96,94.19,116.03,convnexttiny_com_fundo_random_seed2026
+random_convnext_perclasse,ConvNeXtTiny,com_fundo,9001,,,96.61,94.01,105.06,convnexttiny_com_fundo_random_seed9001
+random_convnext_perclasse,ConvNeXtTiny,com_fundo,7,,,96.39,93.27,111.02,convnexttiny_com_fundo_random_seed7
+random_convnext_perclasse,ConvNeXtTiny,com_fundo,123,,,96.71,93.65,89.55,convnexttiny_com_fundo_random_seed123
+random_convnext_perclasse,ConvNeXtTiny,com_fundo,2024,,,96.88,94.05,73.67,convnexttiny_com_fundo_random_seed2024
+random_convnext_perclasse,ConvNeXtTiny,com_fundo,31337,,,96.83,93.09,118.86,convnexttiny_com_fundo_random_seed31337
+random_convnext_perclasse,ConvNeXtTiny,com_fundo,777,,,96.71,92.64,94.84,convnexttiny_com_fundo_random_seed777
+random_convnext_perclasse,ConvNeXtTiny,com_fundo,555,,,96.83,94.03,83.18,convnexttiny_com_fundo_random_seed555
